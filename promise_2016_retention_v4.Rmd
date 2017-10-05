@@ -1,7 +1,7 @@
 ---
 title: "Updated Promise Fall 2016 study"
 author: "Jason Whittle"
-date: "7/19/2017"
+date: "10/4/2017"
 header-includes:
     - \usepackage{fancyhdr}
     - \pagestyle{fancy}
@@ -14,7 +14,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, cache = T)
 ```
 
 ```{r data importing, preping and function creation, echo=FALSE, cache=FALSE, warning=FALSE, include=FALSE} 
@@ -521,15 +521,15 @@ Students only needed to apply for enrollment and fill out FAFSA. Upon submitting
 \item Promise increased the number of credits attempted (+2.7) and earned (+2.1) in Fall 2016.
 \item Increased course load \textit{did not} have a negative impact on Promise students' term GPA. 
 \item New Promise students are forecasted to achieve the 60-earned-credits mark a full semester faster than if they had never received Promise. 
-\item Receiving Promise had a small to no impact on Fall to Spring retention. Promise students were already very likely to retain Fall-Spring.
-\item If Promise is expected to have an impact on institutional retention participation in the program needs to be dramatically increased. 
+\item There is very weak evidence that receiving Promise had a positive effect on Fall to Spring retention for some students. Promise students were already very likely to retain Fall-Spring.
+\item In order for Promise to have an impact on institutional retention participation in the program needs to be dramatically increased. 
 \end{itemize}
 
 ## Results
  \textit{Promise students completed more courses, without a decrease in academic performance\footnote{Due to Promise.} and were less financially burdened.} Promise incentivizes full time "traditional" progress through college, thus could be viewed as a completion program.
 
 ### Impact of Promise on credits attempted and credits earned
-Both credits earned and attempted showed statistically significant increases even when controlling for year to year trends. Credits attempted because of Promise increased by 2.7 credits (+/- 0.74 at the 95% confidence interval) and credits earned increased by 2.1 credits (+/- 0.7 at the 95% confidence interval). The impacts of Promise were assessed using a difference-in-difference model (detalied in table 1). Demographic and academic controls were used along with a trend and treatment variables. Simulation shows that \emph{a new Promise student will reach 60 earned credit hours a full semester faster than if they had never received Promise funds and only recieved Pell funds (4.5 semesters vs. 5.5) and a semester and a half faster than a non-Promise non-Pell student.}
+Both credits earned and attempted showed statistically significant increases even when controlling for year to year trends. Credits attempted because of Promise increased by 2.7 credits (+/- 0.74 at the 95% confidence interval) and credits earned increased by 2.1 credits (+/- 0.7 at the 95% confidence interval). The impacts of Promise were assessed using a difference-in-difference model (detailed in table 1). Demographic and academic controls were used along with trend and treatment variables. Simulation shows that \emph{a new Promise student will reach 60 earned credit hours a full semester faster than if they had never received Promise funds and only received Pell funds (4.5 semesters vs. 5.5) and a semester and a half faster than a non-Promise non-Pell student.}
 
 ### Impact of Promise on student GPA
 Promise students' GPA\footnote{Since GPA is not normally distributed the transformation of (Term GPA - Cumulative GPA) was used for analysis.} fell from an average of 3.3 in Fall 2015 to 3.0 in Fall 2016. This result was significant with a two-sided t-test. Simple averages do not tell the full story however, since controls for a potential fall in non-Promise student GPA over the same period of time need to be considered. Progressing from introductory or remedial courses to more advanced courses could potentially reduce student GPA over time and still be a sign of progress. When applying appropriate controls there appears to be no significant negative effect of Promise on student GPA when controlling for the trend of all students enrolled in Fall 2015 and Fall 2016. The decrease in average GPA from 3.3 to 3.0 was not isolated to Promise recipients and thus is not an effect of Promise.
@@ -538,36 +538,36 @@ Promise students' GPA\footnote{Since GPA is not normally distributed the transfo
 \textit{At best Promise had a small impact on retention but even this isn't clear. Participation in the promise program was relatively small.}
 
 ### Impact of Promise on Fall 2016 to Spring 2017 retention
-The Fall 2016 Promise students were retained to Spring 2017 at a very high level, 83%. Pell only students retained at 76% and non-Pell qualifying students retained at 62%. However when other characteristics of student retention were controlled for such as demographics and GPA in Fall 2016 for the control group the difference in Promise to Pell retention rates cannot be said to be caused by Promise funds.
+The Fall 2016 Promise students were retained to Spring 2017 at a very high level, 83%. Pell only students retained at 76% and non-Pell qualifying students retained at 62%. However when other characteristics of student retention were controlled for such as demographics and GPA for the control group the difference in Promise to Pell retention rates cannot be said to be caused by Promise funds.
 
-The impacts of Promise on retention were evaluated using two methods for logistic regression: Bayesian Model Averaging (BMA) and Markov Chain Monte Carlo (MCMC). Both of these methods estimated small positive impacts on retention caused by Promise. However, none of these estimates were clearly non-zero (estimated confidence intervals included 0 and negative predicted values). At this time statistical analysis cannot say that Promise had a positive impact on Fall to Spring retention however continued modeling and data will help flush this effect out. 
+The impacts of Promise on retention were evaluated using three methods for causal analysis: Bayesian Model Averaging (BMA), Markov Chain Monte Carlo (MCMC) and propensity score matching. All of these methods estimated small positive impacts on retention caused by Promise. However, none of these estimates were clearly non-zero (estimated confidence intervals included 0 and negative predicted values).  
 
-Many controls were used in the statistical models to better isolate Promise's impact on retention. Demographics (age, gender, racial/ethnic minority) were controlled for along with total credits, transfer credits, term credit, Fall 2016 GPA, a flag for first semester students and Pell received.\footnote{Pell award and term credit might be seen as problematic since they are critical to Promise. Several models were run that did not included them or attempted to transform them into a less problematic form. None of these transformations produced "better" retention results than what is presented in this paper.} All of the control variables were interacted with Promise to ensure that Promise's impacts were not being picked up by and mistakenly associated with these other control variables since many of the control variables are associated with Promise's requirements.  
+<!-- Many controls were used in the statistical models to better isolate Promise's impact on retention. Demographics (age, gender, racial/ethnic minority) were controlled for along with total credits, transfer credits, term credit, Fall 2016 GPA, a flag for first semester students and Pell received.\footnote{Pell award and term credit might be seen as problematic since they are critical to Promise. Several models were run that did not included them or attempted to transform them into a less problematic form. None of these transformations produced "better" retention results than what is presented in this paper.} All of the control variables were interacted with Promise to ensure that Promise's impacts were not being picked up by and mistakenly associated with these other control variables since many of the control variables are associated with Promise's requirements. -->
 
 <!-- The two methods were split on whether the amount of promise funds given to a student had an effect. BMA estimated the amount of promise a student received had a very low and probably zero effect on retention. The conclusion one would draw from this methodology would be that the amount of Promise funds given to a student \textit{did not} help predict their return the following semester. However, Bayesian logistic regression, using the model BMA picked\footnote{Description of this process in the methodology section.} shows a small consistent positive impact for the amount of promise funds given to a student on retention. What this mixed result means for the Promise program is that receiving Promise funds alone does not seem to increase a student's likelihood to re-enroll at SLCC. There is weak evidence overall that the amount of Promise funds received has a small impact on retention, i.e. the more Promise funds a student received in Fall 2016 the more likely they were to return in Spring 2017.  -->
 
 ## Promise as a retention program in 2016
 
-Promise as currently designed will face hurdles in playing a significant role in SLCC retention efforts. While Promise clearly benefited those students who participated in it, there are several potential issues with it being considered a retention program. If Promise is intended to have an institution level impact on SLCC it was far too small to accomplish this (544 students in Fall 2016). The design of Promise might explain some of the limited student participation in Promise in Fall 2016 (elaborated below). The marketing and dissemination of information about Promise may also have had an impact on the under-utilization of Promise. However, this aspect of Promise's implementation was not evaluated.
+Promise incentivizes enrollment in the current term, not the following term. Promise as currently designed will face hurdles in playing a significant role in SLCC retention efforts. While Promise clearly benefited those students who participated in it, there are several potential issues with it being considered a retention program. If Promise is intended to have an institution level impact on SLCC it was far too small to accomplish this (544 students in Fall 2016). The design of Promise might explain some of the limited student participation in Promise in Fall 2016 (elaborated below). The marketing and dissemination of information about Promise may also have had an impact on the under-utilization of Promise. However, this aspect of Promise's implementation was not evaluated.
 
 ### The students SLCC already retains
 
-One of Promise's core criteria is that a student be Pell eligible; SLCC already retains over 75% of its Pell students. Promise targets students who are the most likely to retain regardless of the increased financial incentive. There are likely not many students on the fence about either returning full time or dropping out entirely who would be persuaded to stay by tuition waivers, given that these students are already receiving financial support in the form of Pell. Promise could potentially entice students to postpone transferring.\footnote{Currently there is not enough qualitative analysis of SLCC early transfer(outs) to know the reason they leave is tuition and fees or for some other reasons.} Since SLCC is currently the most affordable option for college in Salt Lake County it is unlikely students would transfer for financial reasons. To many Pell students, Promise might come down to a question of how many classes do they want to take. 
+One of Promise's core criteria is that a student be Pell eligible; SLCC already retains over 75% of its Pell students. Promise targets students who are the most likely to retain regardless of the increased financial incentive. There are likely not many students on the fence about either returning full time or dropping out entirely who would be persuaded to stay by tuition waivers, given that these students are already receiving financial support in the form of Pell. Promise could potentially entice students to postpone transferring.\footnote{Currently there is not enough qualitative analysis of SLCC early transfer(outs) to know the reason they leave is tuition and fees or for some other reasons.} Since SLCC is currently the most affordable option for college in Salt Lake County it is unlikely students would transfer for financial reasons. To many Pell students, Promise funds might come down to a question of how many classes do they want to take. 
 
 ### Credit hour requirement
 
-Money is not the only limiting factor students face in returning to college, especially for non-traditional students. If you have to take night classes for instance: how can you take more than 9 credit hours a semesters?\footnote{Let alone finding 12 credit hours of classes in your major at night for multiple semesters.} We know that "classes at the wrong time of day" is a major problem cited by SLCC students.\footnote{Survey results from spring 2017.} Many SLCC students might see a free $751 of classes sitting there but lack the flexibility to enroll. Promise tuition waivers are not a substitute for a full-time or even most part-time jobs. A lot of jobs don’t allow you to fine tune the amount of hours you work and when those hours are. A student might correctly judge that taking 12-16 hours (to meet Promise's requirements) is too much of a commitment in addition to working, family responsibilities and other aspects of life they give priority to. Given the high number of SLCC students who have to work this might be a large road block in the path to increasing the number of students who take advantage of Promise. If Promise remains a program with participation in the hundreds per term it is highly unlikely to "move the needle" on institution wide retention rates.
+Money is not the only limiting factor students face in returning to college, especially for non-traditional students. If you have to take night classes for instance: how can you take more than 9 credit hours a semesters?\footnote{Let alone finding 12 credit hours of classes in your major at night for multiple semesters.} We know that "classes at the wrong time of day" is a major problem cited by SLCC students.\footnote{Survey results from spring 2017.} Many SLCC students might see a free $751\footnote{Average Fall 2016 Promise award.} of classes sitting there but lack the flexibility to enroll. Promise tuition waivers are not a substitute for a full-time or even most part-time jobs. A lot of jobs don’t allow you to fine tune the amount of hours you work and when those hours are. A student might correctly judge that taking 12-16 hours (to meet Promise's requirements) is too much of a commitment in addition to working, family responsibilities and other aspects of life they give priority to. Given the high number of SLCC students who have to work this might be a large road block in the path to increasing the number of students who take advantage of Promise. If Promise remains a program with participation in the hundreds per term it is highly unlikely to "move the needle" on institution wide retention rates.
 
 ### Maybe not enough incentive 
 
-Promise lowers the financial burden of college but SLCC is already a cheap option and potentially not the most significant financial commitment in a students' life. The average amount of promise funds "paid" to a student was \$751.70 and the maximum was $1546. That is probably not enough of a bargin to, in some students’ minds, justify the extra commitment and rescheduling of life that would be required to qualify for Promise (12 credit hours) or put off other academic interest such as early transfer. Promise encourages students at SLCC to take more classes (not necessarily retain). Financially, it might be more useful to forgo Promise and just keep taking 6-9 credit hours a semester if that allows you to maintain the work hours required to pay for other necessities.  
+Promise lowers the financial burden of college but SLCC is already a cheap option and potentially not the most significant financial commitment in a students' life. The average amount of promise funds "paid" to a student was \$751.70 and the maximum was $1546. That is probably not enough of a bargain to, in some students’ minds, justify the extra commitment and rescheduling of life that would be required to qualify for Promise (12 credit hours) or put off other academic interest such as early transfer. Promise encourages students at SLCC to take more classes (not necessarily retain). Financially, it might be more useful to forgo Promise and just keep taking 6-9 credit hours a semester if that allows you to maintain the work hours required to pay for other necessities. As will be shown shortly, students increased their course load by approximately one course a semester but typically not by two plus courses. 
 
 # Methodology and data preparation
 
 ## Data preparation
 For the difference-in-difference models students who were enrolled in both Fall 2015 and Fall 2016 were used for comparisons (11,125 students). This allowed for additional controls to be placed on these models and further isolate the impacts of Promise. For the logistic regressions run to answer questions about retention the data were limited to Fall 2016 students who 1) did not receive an award in Fall 2016, 2) recorded a GPA in Fall 2016, and 3) had a record for demographic information on gender and ethnicity (21,350 students).   
 
-There were 235 \textit{future} Promise students enrolled in SLCC in Fall 2015\footnote{These are the students who would go on to receive Promise in Fall 2016.} a year prior to the start of Promise. Focusing on these students allows for comparisons of their college behavior before and after Promise for questions relating to academic performance and credits taken per semester. To separate the trend from the treatment effects for Promise students a difference-in-difference model (DiD) was used for analyzing the impact of Promise on GPA, credits attempted and earned. Various demographic and academic controls were used within the DiD model to isolate the impact of Promise. DiD analysis sheds light on how Promise students have potentially changed because of the implementation of the program. Two DiD models were estimated with both frequentist and Bayesian linear regressions. 
+There were 235 \textit{future} Promise students enrolled in SLCC in Fall 2015\footnote{These are the students who would go on to receive Promise in Fall 2016.} a year prior to the start of Promise. Focusing on these students allows for comparisons of their college behavior before and after Promise for questions relating to academic performance and credits taken per semester. To separate the trend from the treatment effects for Promise students a difference-in-difference model (DiD) was used for analyzing the impact of Promise on GPA, credits attempted and earned. Various demographic and academic controls were used within the DiD model to isolate the impact of Promise. DiD analysis sheds light on how Promise students have potentially changed because of the implementation of the program. Two DiD models were estimated with both frequentist and Bayesian linear regressions. Further data preparation for the propensity score matching model will be discussed later. 
 
 ## Difference in difference model: GPA
 
@@ -623,8 +623,8 @@ F Statistic (df = 7; 21696) & 138.542$^{***}$ & 396.107$^{***}$ & 724.087$^{***}
 \end{tabular} 
 \end{table} 
 
-## Retention models evaluated thus far
-BMA was the primary statistical method used to model Fall to Spring retention. BMA is a robust methodology that provides robust estimated values of variables for a variety of regression based methodologies. Since retention is a yes or no variable (Did the student enroll in the next semester?), a logistic modeling methodology was used.  BMA more accurately captures the uncertainty associated with statistical modeling than most other statistical methodologies. BMA evaluates all possible models given the data set\footnote{2,097,152 models for this study.} and then provides a weighted average estimate for the independent variables based on the probability of the sub-models. This method directly takes into consideration model uncertainty and also provides the tools for analysis of this model uncertainty. Almost all other methodologies completely ignore model uncertainty or perform specification searches that are not documented or transparent. 
+## Retention models 
+BMA was the primary statistical method used to model Fall to Spring retention initially. BMA is a robust methodology that provides robust estimated values of variables for a variety of regression based methodologies. Since retention is a yes or no variable (Did the student enroll in the next semester?), a logistic modeling methodology was used.  BMA more accurately captures the uncertainty associated with statistical modeling than most other statistical methodologies. BMA evaluates all possible models given the data set\footnote{2,097,152 models for this study.} and then provides a weighted average estimate for the independent variables based on the probability of the sub-models. This method directly takes into consideration model uncertainty and also provides the tools for analysis of this model uncertainty. Almost all other methodologies completely ignore model uncertainty or perform specification searches that are not documented or transparent. 
 
 ### Robustness: Retention
 Ignoring model uncertainty can dramatically under estimate the uncertainty of the statistical results generated. Specification searches introduce bias and leads to over-fitting models\footnote{Including more "explanatory" variables than should be in the model. Over-fitting often leads to the illusion of a better fit and obscures "true" effects. Documented in Wang, Zhang \& Bakhai 2004.}. This may explain why BMA finds the interaction term (promise*promise) to have next to no effect and likely not a variable that should be included in the final model, while Bayesian logistic regression\footnote{Just one model specification, no averaging.} finds it to have a small positive effect. BMA rewards parsimony in models and thus often will produce sparse models, indeed, null models are not uncommon.
@@ -645,16 +645,22 @@ The \textit{Promise}\*\textit{Promise} (pr.pr) interaction term has a similar re
 ## Bayesian logistic regression: Retention
 In order to more clearly understand the probability distributions for variables with any explanatory power a second analysis was performed. The independent variables from the BMA (all the variables that had any color in Figure 1\footnote{Variables that had any explanatory power.}) were placed into a Bayesian logistic regression as a model. This is more similar to the type of study that would be performed for this type of question others may have performed.\footnote{The type of statistical modeling that would have you ignore model uncertainty.} From this regression the probability distributions in Figure 2 (below) are generated. Given the way the data was transformed (odds ratios) for this analysis the value 1 on the x-axis represents no effect for the individual variable (indicated by the vertical line). Values greater than 1 represent a positive effect on retention and values less than 1 represent a negative effect on retention. These distributions were generated using a Markov Chain Monte Carlo simulation, where the posterior distribution is created by drawing from data 1000 times\footnote{This is similar to thinking about determining if a coin is 'fair' by flipping a model based on the observations of that coin 1000 times.}. 
 
-## Propensity Score mathching
-A thrid study was conducted to validate the BMA and Bayesian logit model results. This study used data that was pulled seperately from the data for both the BAM and Bayes logit. Propensity score matching was used to synthetically create controll group to compare the promise students too. Propensity scoring methods are meant to mimic the behavior of a controlled experiement. The 'treated' group (promise students) need to be compared to students who, but for randomness, could have been treated. 
+![Posterior distributions for variables included in the Bayesian logistic regression. The vertical line indicates 1 on the x-axis or 1:1 odds (no impact). Posterior distributions that are completely to the right of the vertical line have a clear positive impact according to the model (Fall GPA, Pell, Term credits, and just barely pr*pr). All other variable posterior cross the vertical line indicating a large amount of uncertainty of the effect of these variables (it is not even clear if they have a positive or negative impact on retention).](promise_plots/logit_hist.png)
 
-All students who were Pell eligible in the Fall 2016 semester were scored based on previous academic, demographic and course taking behavior.\footnote{The treatment model used a generalized boosted model for the classification problem.} Once these scores were generated, students were matched first by exactly grouping promise students and potential control student based on their entry cohort term. Second, the students were then paried to a minimum of one student based on their propensity score.\footnote{Matching on the propensity scores was calipered to less than or equal to .25 standard deviations. This means that propensity scores were not matched to one another unless they were within .25 standard deviation from each other. If scores failed to meet this criteria they were excluded since no acceptable match could be found (Rosenbaum and Rubin 1985).} Finally, retention in Spring 2017 for the two student groups (treated by reciving promise funds vs. synthetic control) were compared to each other and Abadie-Imbens bias corrected standard errors and p-values were used to establish statistical significance of the effect.\footnote{Abadie and Imbens 2002.} 
+
+## Propensity Score mathching
+A third study was conducted to validate the BMA and Bayesian logit model results. This study used data that was pulled separately from the data for both the BMA and Bayes logit. Propensity score matching was used to synthetically create control groups to compare the promise students too. Propensity scoring methods are meant to mimic the behavior of a controlled experiment. The 'treated' group (Promise students) need to be compared to students who, but for randomness, could have been treated. 
+
+All students who were Pell eligible in the Fall 2016 semester were scored based on previous academic, demographic and course taking behavior.\footnote{The treatment model used a generalized boosted model for classification.} Once these scores were generated, students were matched first by exactly grouping promise students and potential control student based on their entry cohort term. Second, the students were then paired to a minimum of one student from the control set based on their propensity score.\footnote{Matching on the propensity scores was calipered to less than or equal to .25 standard deviations. This means that propensity scores were not matched to one another unless they were within .25 standard deviation from each other. If scores failed to meet this criteria they were excluded since no acceptable match could be found (Rosenbaum and Rubin 1985).} Finally, retention in Spring 2017 for the two student groups (treated by reviving promise funds vs. synthetic control) were compared to each other and Abadie-Imbens bias corrected standard errors and p-values were used to establish statistical significance of the effect.\footnote{Abadie and Imbens 2002.} 
 
 ### Continuing students in Fall 2016
-This sub group consists of students who had a minimmum term less than Fall 2016 and were Pell eleligable in Fall 2016. These students were enrolled at SLCC for at least one term prior to Fall 2016. There were 3889 students who fell into this subgroup with 283 promise students. There were 15 students in this subgroup who could not be matched becuase their minimum term of enrollment at SLCC did not contain a suitable matched controll observation.\footnote{If there were no students in the control who had the same starting term at SLCC they promise student would not find a match. If there were students in the control who had the same starting term at SLCC but their propensity scores were more than 0.25 standard devaitions away from the promise student, the promise student would not find a match.} 268 promise students were able to find adequate matches. The propenseity score matching used for this study allowed for replacement of controlls and for a promise student to match to more than one control. This lowers potential bias by allowing the model to synthetically recreate a promise student in the aggregate but slows down the programs run time. When the matching generates more than one match for a promise student weights are applied algorithmically to avoid oversampling and biasing the group estimate (rebalancing the multiple matches to have the weight of just one observation). This potential bias is why Abadie and Imbens bias corrected standard errors and p-values were used in this study.
+This sub group consists of students who had a minimum term less than Fall 2016 and were Pell eligible in Fall 2016. These students were enrolled at SLCC for at least one term prior to Fall 2016. There were 3889 students who fell into this subgroup with 283 promise students (table 2). There were 15 students in this subgroup who could not be matched because their minimum term of enrollment at SLCC did not contain a suitable match in the control observations.\footnote{If there were no students in the control who had the same starting term at SLCC they promise student would not find a match. If there were students in the control who had the same starting term at SLCC but their propensity scores were more than 0.25 standard deviations away from the promise student, the promise student would not find a match.} 268 promise students were able to find adequate matches. The propensity score matching used for this study allowed for replacement of controls and for a promise student to match to more than one control. This lowers potential bias by allowing the model to synthetically recreate a promise student in the aggregate but slows down the programs run time. When the matching generates more than one match for a promise student weights are applied algorithmically to avoid oversampling and biasing the group estimate (re-balancing the multiple matches to have the weight of just one observation). This potential bias is why Abadie and Imbens bias corrected standard errors and p-values were used in this study. These students' propensity scores were calculated using 17 base variables.\footnote{Table of variables and descriptions is in the appendix.}
 
+### First time students Fall 2016 with no higher education academic records
+This sub group consists of students who were Pell eligible and in their first term at SLCC with no prior college level GPA records. 1602 students were included in this group with 135 of them being Promise students (table 2). Due to this subgroup's paucity of matching variables (7) associated with the lack of any prior college level academic records, exact matching on 5 digit zip code was implemented. Matching on 5 digit zip code attempts to isolate some socio-economic factor beyond the students basic demographics. Since it is not known how this student group will perform in college this methodology of exact matching attempts to control for as many background factors as possible. Keep this in mind, the Continuing student group matches are the best since the propensity scores and exact matching data are the most robust for that group. 
 
-### First time students Fall 2016 with no academic records at SLCC
+### First time students Fall 2026 with higher education academic records
+This subgroup consists of students who are Pell eligible and in their first term at SLCC but have prior GPA and credits earned. There are only 440 students in this group with 52 being promise students (table 2). Of the 52 promise students 51 were able to find a synthetic match with one promise student being dropped due to no control group propensity score being within 0.25 standard deviations. This subgroup's propensity scores were generated using the same 17 variables available for the continuing students, however they are not as robust as the continuing subgroup but from an academic controls perspective more robust than the first time no record students.
 
 ```{r, echo=FALSE, include=FALSE}
 Nc <- 3889
@@ -679,12 +685,12 @@ ff_gpa_est <- rbind(Estimate, AISE, AI_p.val, Nc, Nt, Mo, Moun, drop)
 
 Nc <- 1602
 Nt <- 135
-Mo <- 135
-Moun <- 3212
-drop <- 0
-Estimate <- 0.019
-AISE <- 0.036
-AI_p.val <- 0.583
+Mo <- 110
+Moun <- 162
+drop <- 25
+Estimate <- 0.035
+AISE <- 0.043
+AI_p.val <- 0.406
 ff_nogpa_est <- rbind(Estimate, AISE, AI_p.val, Nc, Nt, Mo, Moun, drop)
 
 results <- cbind(cs_gpa_est, ff_nogpa_est, ff_gpa_est)
@@ -701,30 +707,23 @@ knitr::kable(results[4:8,], caption = "Propensity score matching group propertie
 
 
 
+## Propensity score results
+
+Table 3 below shows none of the subgroups showed clear and strong evidence in favor of a Spring 2017 Promise retention effect. There are however two results worth noting. First for continuing students the estimated effect of Promise on retention was 6% which is not far from the 8% that BMA estimated. The consistency seems encouraging but BMA, Bayes Logit and the propensity score model do not attribute statistical significance to this estimate. In other words, none of the three methodologies can clearly say the effect of Promise on retention wasn't zero. The propensity score model estimate was closer to crossing the arbitrary "significance" threshold used for casual analysis but still fell short. For continuing students the effect of Promise on retention was likely small and statistical modeling finds difficulty assigning strong causality to Promise. 
+
+Second, for first term students with college level academic records a similarly 'close to statistically significant' result for the -11% estimate was found. This is deceiving though since this is the smallest subgroup and the results are likely very volatile to sample size. This subgroup was analysed by exact matching on five digit zip in a seperate analysis which produced a zero estimate but with a substantially less reliable, smaller observation set. 
+
+Finally for the first term students with no prior college level academic records the estimate is far from significantly different than zero and we must therefore conclude there is no retention effect. Part of this might be the difficulty in creating a "good" synthetic control for these students with little academic control data available. 
+
 ```{r, echo=FALSE}
 knitr::kable(results[1:3,], caption = "Propensity score matching estimated effects")
 ```
 
+## Conclusions from all three methodologies: Retention
+It is clear from the three methodologies that there is no clear Spring 2017 retention effect due to Promise in Fall 2016. There is some very weak evidence that there might have been something, probably positive and probably small. This weak evidence the retention effect is different than zero is in both the Bayesian Logit model (figure 2) and the propensity score matching model for one of the three subgroups (table 3), \textit{emphasis on the weak evidence.} 
 
-
-
-
-### First time students Fall 2016 with academic records at SLCC
-
-
-
-
-## Conclusions of both methodologies: Retention
-As can be seen in Figure 2, \textit{promise} x \textit{promise} (pr\*pr, middle plot)\footnote{Interaction terms explained earlier.} always has a clear positive effect. Out of the 1000 simulated draws none of them were at or below 1, implying a clear positive effect. The Bayesian logistic regression suggests that the more Promise funds a student received in the Fall 2016 semester the more likely that student was to enroll in Spring 2017 at SLCC. 
-
-Bayesian logistic regression reinforces the result of the BMA that \textit{promise} has a significant portion of its distribution below 1, indicating that receiving Promise by itself in the Fall of 2016 has an unclear impact on retention (just getting Promise didn't change your likelihood of returning in the spring). \textit{promise}\*\textit{pell} was a "bad" variable in the BMA and is also singled out by the Bayesian logistic regression, over 875 of the 1000 draws were at 1 implying zero effect(row 2, column 1 in Figure 2). Fall GPA, term credit and Pell award were all clearly positive with this methodology as well. Given that BMA is more parsimonious than the one model used for the results in figure 2 it seems prudent to say there is very weak to no evidence of Promise having an effect on Spring 2017 retention. 
-
-![Posterior distributions for variables included in the Bayesian logistic regression. The vertical line indicates 1 on the x-axis or 1:1 odds (no impact). Posterior distributions that are completely to the right of the vertical line have a clear positive impact according to the model (Fall GPA, Pell, Term credits, and just barely pr*pr). All other variable posterior cross the vertical line indicating a large amount of uncertainty of the effect of these variables (it is not even clear if they have a positive or negative impact on retention).](promise_plots/logit_hist.png)
 
 \newpage
-
-## Need for a retention study
-
 ### BMA output summary
 
 ```{r, echo=FALSE, include=FALSE}
@@ -775,11 +774,29 @@ post prob &  &  &  &  0.461 &  0.170 &  0.159 &  0.067 &  0.053 \\
 
 Table 2 above displays the raw BMA logistic regression output. Estimated values (EV) and standard deviations (SD) are in log-odds ratio format. p!=0 provides the probability that the variable is non-zero and should be included in the model. Most variables lack 'robustness' and therefore are not included or have a p!=0 score well below 50\%.
 
-
-
 ### Data sources
 
-The retention data for this study was initially pulled by Lisa Daines from Banner and Financial Aid tables. Marie Taylor contributed additional Banner data for the GPA, credits attempted and earned studies. Data cleaning and analysis was performed by Jason Whittle.
+The retention data for this study was initially pulled by Lisa Daines from Banner and Financial Aid tables. Marie Taylor contributed additional Banner data for the GPA, credits attempted and earned studies. Propensity score data was pulled from enroll schema by Jason whittle. All data cleaning and analysis was performed by Jason Whittle.
+
+\newpage
+
+### Propensity score matching variables and definitions
+
+```{r, echo = FALSE}
+variables <- readxl::read_xlsx("ps_variable_desc.xlsx")
+knitr::kable(variables[1:28,1:5])
+```
+
+\newpage
+### Histograms of Propensity Score matches
+
+![Histogram of propensity scores for continuing students in Fall 2016 matched sample. Yellow bars are for controls and blue boxes are for promise students.](cs_gpa.png)
+
+![Histogram of propensity scores for first time students with no college level records in Fall 2016 matched sample. Yellow bars are for controls and blue boxes are for promise students.](ff_nops_plot.png)
+
+![Histogram of propensity scores for first time students with college level records in Fall 2016 matched sample. Yellow bars are for controls and blue boxes are for promise students.](ff_ps_plot.png)
+
+
 
 
 ```{r, echo=FALSE, include=FALSE, eval=FALSE}
