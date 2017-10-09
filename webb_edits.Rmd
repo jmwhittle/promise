@@ -1,0 +1,1068 @@
+---
+title: "The Impact of Salt Lake Community College's Promise Program"
+author: "Jason Whittle"
+date: "10/4/2017"
+header-includes:
+    - \usepackage{fancyhdr}
+    - \pagestyle{fancy}
+    - \rhead{\includegraphics[width=3cm,height=3cm]{logo.jpeg}}
+    - \chead{Jason Whittle}
+    - \lhead{Promise Fall 2016 study}
+output:
+  pdf_document:
+    fig_caption: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache = T)
+```
+
+```{r data importing, preping and function creation, echo=FALSE, cache=FALSE, warning=FALSE, include=FALSE} 
+# @jasonwhittle
+library(tidyverse)
+data <- read_csv("promise_20170124.csv") #23346 rows
+
+# cleaning the data
+data <- data %>% filter(GENDER == "F" | GENDER == "M") #23256 rows
+data$GENDER <- ifelse(data$GENDER == "M", 1, 0) # dummy creation male = 1, female = 0... Gender normative.
+data$white <- ifelse(data$ETHNICITY == "Caucasian", 1, 0) # dummy creation white = 1, non-white = 0. Not sure why I am getting NAs still? Removed NAs later
+
+#spring enrollment information, Fall 2016 GPA and Fall 2016 graduations. 
+spring <- read_csv("promise_spring_20170307.csv")
+colnames(spring) <- c("ID", "SPRING_ENROLLMENT", "SP_CREDITS", "FALL_GPA", "FALL_AWARD", "FALL_FIRST")
+data <- left_join(data, spring, by = "ID")
+
+# changing promise_paid NAs to 0s: 22714
+data$PROMISE_PAID[is.na(data$PROMISE_PAID)] <- 0
+
+# changing trans_cr NAs to 0s: 16870
+data$TRANS_CR[is.na(data$TRANS_CR)] <- 0
+
+# changing total_cr NAs to 0s: 17742
+data$TOTAL_CR[is.na(data$TOTAL_CR)] <- 0 # seems really high, it would mean 12k non first semester students had 0 credit.
+
+# REMOVING fall_gpa NAs from data: 777 no promise students in this. Most appear to be in CTE
+data <- data %>% filter(is.na(FALL_GPA) == F)
+
+# REMOVING ethnicity NAs from data: 125 2 promise students in this. 
+data <- data %>% filter(is.na(ETHNICITY) == F)
+
+# subset first semester students
+data.1st <- data %>% filter(FALL_FIRST == 1 & FALL_AWARD == 0) # 12 students recieved an award in fall 2016 in this group. 66.96% retention
+
+# subset not first semeseter students
+data.con <- data %>% filter(FALL_FIRST == 0 & FALL_AWARD == 0) # 1003 students recived an award in fall 2016 in this group. 69.66% retention
+
+#promise flag
+data$promise <- ifelse(data$PROMISE_PAID > 0, 1, 0)
+```
+
+```{r, include=FALSE}
+#@jas
+library(BMA)
+library(arm)
+
+#full data set
+data.full <- data %>% filter(FALL_AWARD == 0)
+data.full[is.na(data.full) == TRUE] <- 0
+
+#functions to create X maticies
+# independent variable matrix
+indy <- function(x){
+  cbind(rescale(x$AGE),
+        x$GENDER,
+        x$white,
+        rescale(x$TOTAL_CR),
+        rescale(x$TRANS_CR),
+        rescale(x$FALL_GPA),
+        rescale(x$PROMISE_PAID))
+}
+
+#interaction terms matrix
+# could've used lapply here on the list created by indy instead.
+inter <- function(x, y) {
+  cbind(rescale(x$AGE)*rescale(y),
+        x$GENDER*rescale(y),
+        x$white*rescale(y),
+        rescale(x$TOTAL_CR)*rescale(y),
+        rescale(x$TRANS_CR)*rescale(y),
+        rescale(x$FALL_GPA)*rescale(y),
+        rescale(x$PROMISE_PAID)*rescale(y))
+}
+
+# dependent variable
+y.full <- cbind(data.full$SPRING_ENROLLMENT)
+
+#independent variables
+X.full.iv <- indy(data.full)  
+X.full.iv <- cbind(X.full.iv, 
+                   rescale(data.full$PELL_PAID), 
+                   rescale(data.full$TERM_CR), 
+                   data.full$FALL_FIRST)
+colnames(X.full.iv) <- c("Age", "Gender", "White", "Tot_cr", "Trans_cr", "Fall gpa", "promise", "Pell", "Term_CR", "1st sem")
+
+# interactions terms
+X.full.in <- inter(data.full, data.full$PROMISE_PAID)
+# not adding term since it is a requirement of promise... should I add pell? NO!
+X.full.in <- cbind(X.full.in, 
+                   rescale(data.full$PROMISE_PAID)*rescale(data.full$PELL_PAID), 
+                   rescale(data.full$PROMISE_PAID)*data.full$FALL_FIRST, 
+                   rescale(data.full$FALL_GPA)*data.full$FALL_FIRST, 
+                   rescale(data.full$TERM_CR)*data.full$FALL_FIRST)
+colnames(X.full.in) <- c("age*pr", "man*pr", "whi*pr", "tot*pr", "trns*pr", "gpa*pr", "pr*pr", "pr*pell", "pr*1st", "gpa*1st", "CR_1st")
+
+X.full <- cbind(X.full.iv[,], X.full.in[,])
+
+# BMA #1
+bma.full <- bic.glm(X.full, y.full, glm.family = "binomial")
+imageplot.bma(bma.full)
+summary(bma.full)
+bma.table <- as.table(summary(bma.full))
+
+# running logit from BayesLogit on the model that BMA picked to get distributions
+library(BayesLogit)
+X.full[is.na(X.full)] <- 0
+X.test <- X.full[,c(5,6,7,8,9,13,17,18)]
+X.test[is.na(X.test)] <- 0
+X.test <- cbind(1, X.test)
+logit.full <- BayesLogit::logit(y.full, X.test)
+post.logit.full <- data.frame(logit.full$beta)
+X.test.names <- c("int", "Trans_Cr", "Fall GPA", "promise", "Pell", "Term_CR", "whi*pr", "pr*pr", "pr*pell")
+colnames(post.logit.full) <- X.test.names
+post.logit.full <- exp(post.logit.full)
+
+post.logit.full.den <- post.logit.full %>% gather("variable", "n", 1:9) %>% ggplot() + 
+  geom_histogram(aes(x = n, fill = variable), alpha = .4) + 
+  geom_vline(xintercept = 1, alpha = .5) + 
+  facet_wrap(~variable, scales = "free") +
+  theme_bw()
+
+#png("logit_post.png")
+#post.logit.full.den
+#dev.off
+#png("bma_full.png")
+#imageplot.bma(bma.full)
+#dev.off()
+
+post.logit.pr <- cbind(post.logit.full["promise"], post.logit.full["pr*pr"])
+post.logit.pr.pr <- post.logit.pr %>% gather("variable", "n", 1:2) %>% ggplot() + 
+  geom_histogram(aes(x = n, fill = variable), alpha = .4) + 
+  geom_vline(xintercept = 1, alpha = .5) + 
+  facet_wrap(~variable) +
+  theme_bw()
+
+
+post.logit.test1 <- post.logit.pr["pr*pr"] %>% gather("variable", "n", 1) %>% ggplot() + 
+  geom_histogram(aes(x = n, fill = variable), alpha = .4) + 
+  geom_vline(xintercept = 1.0, alpha = .5) + 
+  facet_wrap(~variable) +
+  theme_bw()
+```
+
+```{r, include=FALSE, cache=FALSE, warning=FALSE}
+promise <- read.table("promise_students_20170327.txt", header = T, sep = "|")
+
+pr.201540 <- promise %>% 
+  filter(ACADEMIC_PERIOD == 201540) %>% 
+  filter(GPA_TYPE_DESC == "Institution" & ACADEMIC_STUDY_VALUE_DESC == "Undergraduate")
+
+pr.201540.ids <- data.frame(pr.201540$PERSON_UID)
+colnames(pr.201540.ids) <- "PERSON_UID"
+
+pr.201640 <- promise %>% filter(ACADEMIC_PERIOD == 201640)
+
+# promise students in 201640 that were enrolled in 201540
+not.1.sem <- left_join(pr.201540.ids, pr.201640, by = "PERSON_UID") %>% 
+  filter(GPA_TYPE_DESC == "Institution" & ACADEMIC_STUDY_VALUE_DESC == "Undergraduate")
+
+# # same students in 201540
+# summary(pr.201540)
+# summary(not.1.sem)
+# 
+# ## GPA
+# # 2015 fall gpa
+# mean(pr.201540$GPA) #3.315641
+# sd(pr.201540$GPA) #0.7302326
+# 
+# # 2016 fall gpa
+# mean(not.1.sem$GPA) #3.034742
+# sd(not.1.sem$GPA) #1.038117
+# 
+# # t.test GPA
+# t.gpa <- t.test(pr.201540$GPA, not.1.sem$GPA) # the means are statistically different, Fall 2016 is significantly lower than Fall 2015
+# 
+# ## credits attempted
+# # 2015 credits attemtped
+# mean(pr.201540$CREDITS_ATTEMPTED) #10.70543
+# sd(pr.201540$CREDITS_ATTEMPTED) #3.890331
+# 
+# #2016 credits attempted
+# mean(not.1.sem$CREDITS_ATTEMPTED) #13.31783
+# sd(not.1.sem$CREDITS_ATTEMPTED) #1.860858
+# 
+# # t.test credit attempted
+# t.c <- t.test(pr.201540$CREDITS_ATTEMPTED, not.1.sem$CREDITS_ATTEMPTED) # the means are statistically different, Fall 2016 is significantly higher than fall 2015
+# 
+# ## credits earned
+# # 2015 credit earned
+# mean(pr.201540$CREDITS_EARNED) #9.868217
+# sd(pr.201540$CREDITS_EARNED) #3.939977
+# 
+# # 2016 credits earned
+# mean(not.1.sem$CREDITS_EARNED) #11.68217
+# sd(not.1.sem$CREDITS_EARNED) #3.671288
+# 
+# # t.test credits earned
+# t.ce <- t.test(pr.201540$CREDITS_EARNED, not.1.sem$CREDITS_EARNED) # the means are statisticcally different, Fall 2016 is significantly higher than fall 2015
+# 
+# # table of ts results
+# gpa.2015 <- rbind(mean(pr.201540$GPA), sd(pr.201540$GPA))
+# ca.2015 <- rbind(mean(pr.201540$CREDITS_ATTEMPTED), sd(pr.201540$CREDITS_ATTEMPTED))
+# ce.2015 <- rbind(mean(pr.201540$CREDITS_EARNED), sd(pr.201540$CREDITS_EARNED))
+# 
+# gpa.2016 <- rbind(mean(not.1.sem$GPA), sd(not.1.sem$GPA))
+# ca.2016 <- rbind(mean(not.1.sem$CREDITS_ATTEMPTED), sd(not.1.sem$CREDITS_ATTEMPTED))
+# ce.2016 <- rbind(mean(not.1.sem$CREDITS_EARNED), sd(not.1.sem$CREDITS_EARNED))
+
+# #gpa table
+# promise.comp <- cbind(round(gpa.2015, 2), round(gpa.2016, 2), round(ca.2015, 2), round(ca.2016, 2), round(ce.2015, 2), round(ce.2016, 2))
+# colnames(promise.comp) <- c("GPA F2015", "GPA F2016", "cr. attempted F2015", "cr. attempted F2016", "cr. earned F2015", "cr. earned F2016")
+# rownames(promise.comp) <- c("Mean", "SD")
+# knitr::kable(promise.comp)
+```
+
+```{r, echo=FALSE, warning=FALSE, include=FALSE}
+names(data)
+pell.elg <- data %>% filter(PELL_ELIG == "Y" & TERM_CR < 12) # 4440 rows
+pell.elg %>% ggplot() + geom_histogram(aes(x = PELL_PAID)) + theme_minimal()
+
+fafsa <- data %>% filter(FAFSA_SUBMITTED == "Y" & TERM_CR < 12) # 6986 rows
+fafsa %>% ggplot() + geom_histogram(aes(x = PELL_PAID)) + theme_minimal()
+
+nopell <- fafsa %>% filter(is.na(PELL_PAID) == TRUE | PELL_PAID == 0) # 3559 rows
+
+```
+
+```{r, include=FALSE}
+#functions to create X maticies
+# independent variable matrix
+indy <- function(x){
+  cbind(rescale(x$AGE),
+        x$GENDER,
+        x$white,
+        rescale(x$TOTAL_CR),
+        rescale(x$TRANS_CR),
+        rescale(x$FALL_GPA),
+        rescale(x$PROMISE_PAID))
+}
+
+#interaction terms matrix
+# could've used lapply here on the list created by indy instead.
+inter <- function(x, y) {
+  cbind(rescale(x$AGE)*(y),
+        x$GENDER*rescale(y),
+        x$white*rescale(y),
+        rescale(x$TOTAL_CR)*(y),
+        rescale(x$TRANS_CR)*(y),
+        rescale(x$FALL_GPA)*(y)
+        )
+}
+
+#@jas
+# #full data set
+data.full <- data %>% filter(FALL_AWARD == 0)
+
+y.full <- cbind(data.full$SPRING_ENROLLMENT)
+
+#independent variables
+X.full.iv <- indy(data.full)
+X.full.iv <- cbind(X.full.iv, rescale(data.full$PELL_PAID), rescale(data.full$TERM_CR), data.full$FALL_FIRST)
+colnames(X.full.iv) <- c("Age", "Gender", "White", "Tot_cr", "Trans_cr", "Fall gpa", "promise", "Pell", "Term_CR", "1st sem")
+
+# interactions terms
+X.full.in <- inter(data.full, data.full$promise)
+# Not interacting promise on itself in this BMA
+X.full.in <- cbind(X.full.in, (data.full$promise)*rescale(data.full$PELL_PAID), (data.full$promise)*data.full$FALL_FIRST, 
+                   rescale(data.full$FALL_GPA)*data.full$FALL_FIRST, rescale(data.full$TERM_CR)*data.full$FALL_FIRST)
+colnames(X.full.in) <- c("age*pr", "man*pr", "whi*pr", "tot*pr", "trns*pr", "gpa*pr", "pr*pell", "pr*1st", "gpa*1st", "CR_1st")
+
+X.full <- cbind(X.full.iv[,], X.full.in[,])
+
+# BMA #2?
+bma.full <- bic.glm(X.full, y.full, glm.family = "binomial")
+imageplot.bma(bma.full)
+summary(bma.full)
+bma.table <- summary(bma.full)
+
+#write.csv(promise.students[["ID"]], "promise_students.csv")
+
+```
+
+```{r, echo=FALSE, eval=FALSE, include=FALSE}
+# # only PELL students taking greater than 6 credits compared to promise students
+# new.data <- data.full %>% filter(PELL_PAID > 0) # & TERM_CR > 4) 
+# 
+# y.pell <- cbind(new.data$SPRING_ENROLLMENT)
+# #independent variables
+# X.pell.iv <- indy(new.data)
+# X.pell.iv <- cbind(X.pell.iv, new.data$FALL_FIRST)
+# colnames(X.pell.iv) <- c("Age", "Gender", "White", "Tot_cr", "Trans_cr", "Fall gpa", "promise", "1st sem")
+# 
+# # interactions terms
+# X.pell.in <- inter(new.data, new.data$promise)
+# # Not interacting promise on itself in this BMA
+# X.pell.in <- cbind(X.pell.in,  (new.data$promise)*new.data$FALL_FIRST, 
+#                    rescale(new.data$FALL_GPA)*new.data$FALL_FIRST)
+# colnames(X.pell.in) <- c("age*pr", "man*pr", "whi*pr", "tot*pr", "trns*pr", "gpa*pr", "pr*1st", "gpa*1st")
+# 
+# X.pell <- cbind(X.pell.iv[,], X.pell.in[,])
+# 
+# bma.pell <- bic.glm(X.pell, y.pell, glm.family = "binomial")
+# imageplot.bma(bma.pell)
+# summary(bma.pell)
+# bma.table <- summary(bma.pell)
+# >6 Term_credits promise not even selected in this regression. >5 15% inclusion, >4 16%. only 27.3% with no term credit restriction. 
+# promise students are the same as pell students as far as retention is concerned. 
+```
+
+```{r, include=FALSE}
+#importing and merging data
+promise.pan <- read.table("JW request_20170331.txt", sep = "|", header = TRUE) #11125 rows 15 cols, 235 promise students
+promise.pan$PIDM <- as.factor(promise.pan$PIDM)
+
+# TDUM = 0 for 201540 and 1 for 201640 
+promise.pan.15 <- data_frame(promise.pan$PIDM, promise.pan$TERM_GPA_15,  promise.pan$CREDITS_ATTEMPTED_15, promise.pan$CREDITS_EARNED_15,
+                             promise.pan$PELL_PAID_15, promise.pan$TOTAL_EARNED_CREDITS, promise.pan$CUM_GPA, promise.pan$PRIOR_CREDITS, 
+                             promise.pan$TRANSFER_CREDITS, promise.pan$PROMISE_OFFERED, promise.pan$PROMISE_PAID, 201540, 0)
+
+promise.pan.16 <- data_frame(promise.pan$PIDM, promise.pan$TERM_GPA_16,  promise.pan$CREDITS_ATTEMPTED_16, promise.pan$CREDITS_EARNED_16,
+                             promise.pan$PELL_PAID_16, promise.pan$TOTAL_EARNED_CREDITS, promise.pan$CUM_GPA, promise.pan$PRIOR_CREDITS, 
+                             promise.pan$TRANSFER_CREDITS, promise.pan$PROMISE_OFFERED, promise.pan$PROMISE_PAID, 201640, 1) 
+
+colnames(promise.pan.15) <- c("PIDM", "TERM_GPA", "CREDITS_ATT", "CREDITS_EARNED", "PELL_PAID", "TOT_CRED", "CUM_GPA", "PRIOR_CREDITS", "TRANS_CRED",
+                              "PROMISE_OFFERED", "PROMISE_PAID", "TERM", "TDUM")
+
+colnames(promise.pan.16) <- c("PIDM", "TERM_GPA", "CREDITS_ATT", "CREDITS_EARNED", "PELL_PAID", "TOT_CRED", "CUM_GPA", "PRIOR_CREDITS", "TRANS_CRED",
+                              "PROMISE_OFFERED", "PROMISE_PAID", "TERM", "TDUM")
+
+prom.pan <- rbind(promise.pan.15, promise.pan.16) #470/2 = 235 promise students
+promise_20170126 <- read_csv("promise_20170126.csv") #23467 rows 37 cols
+join.data <- data.frame(promise_20170126$ID, promise_20170126$GENDER, promise_20170126$ETHNICITY, promise_20170126$AGE, promise_20170126$ZIP)
+colnames(join.data) <- c("PIDM", "GENDER", "ETHNICITY", "TERM_AGE", "ZIP")
+join.data$PIDM <- as.factor(join.data$PIDM)
+
+pan.data <- left_join(prom.pan, join.data, by = "PIDM") #470/2 = 235 promise students
+
+# limiting study to those under 70 tot_cred since promise can't have more than 90 attempted. This is not a clean filter for this requirement
+# well this requirement seems to be bull shit. people were given promise with well over 100 credits completed. DROPPING THIS FILTER
+# pan.data <- pan.data %>% filter(TOT_CRED < 79) # drops 2082 students. 382/2 = 191 promise students
+
+# creating diff in diff dummy variables
+pan.data$white <- ifelse(pan.data$ETHNICITY == "Caucasian", 1, 0) # white dummy
+pan.data$GEN <- ifelse(pan.data$GENDER == "M", 1, 0) #34 not specified in og pan.data (#391) will be categorized as 0, none are promise
+pan.data$prom.paid <- ifelse(pan.data$PROMISE_PAID > 0, 1, 0) #promise paid dummy
+pan.data$prom.off <- ifelse(pan.data$PROMISE_OFFERED > 0, 1, 0) #promise offered dummy
+
+# changing promise paid and offered NAs to 0
+pan.data$prom.paid[is.na(pan.data$prom.paid) == T] <- 0
+pan.data$prom.off[is.na(pan.data$prom.off) == T] <- 0
+
+# creating the interaction term
+pan.data$pr.16.int <- pan.data$prom.paid*pan.data$TDUM
+
+# descriptives for 2015 and 2016
+promise.2015 <- promise.pan.15 %>% filter(PROMISE_PAID > 0)
+promise.2016 <- promise.pan.16 %>% filter(PROMISE_PAID > 0)
+non.prm.2015 <- promise.pan.15 %>% filter(is.na(PROMISE_PAID) == T)
+non.prm.2016 <- promise.pan.16 %>% filter(is.na(PROMISE_PAID) == T)
+
+hist(promise.2015$TERM_GPA - promise.2015$CUM_GPA, 50)
+hist(promise.2016$TERM_GPA - promise.2016$CUM_GPA, 50)
+hist(non.prm.2015$TERM_GPA - non.prm.2015$CUM_GPA, breaks = 200)
+hist(non.prm.2016$TERM_GPA - non.prm.2016$CUM_GPA, breaks = 200)
+
+# normalizing the dependent variable
+pan.data$gpa <- pan.data$TERM_GPA - pan.data$CUM_GPA
+
+# running difference in difference to control for the common trend
+# simple dd analysis. no covariates
+dd.gpa <- lm(pan.data$gpa ~ pan.data$TDUM + pan.data$prom.paid + pan.data$pr.16.int + pan.data$CREDITS_ATT) #probably the only good dd model
+
+# dd analysis with covariates
+dd.gpa.v2 <- lm(pan.data$gpa ~ pan.data$TDUM + pan.data$prom.paid + pan.data$pr.16.int + 
+                  pan.data$white + pan.data$TERM_AGE + pan.data$GEN + pan.data$CREDITS_ATT) #doesn't include pell paid. should be a question to the group.
+
+# bayesian-lite dd regressions
+library(MCMCpack)
+dd.gpa.v2.mcmc <- MCMCregress(gpa ~ TDUM + prom.paid + pr.16.int + white + TERM_AGE + GEN + CREDITS_ATT, data = pan.data, marginal.likelihood = c("none"))
+
+ggplot(data.frame(dd.gpa.v2.mcmc)) + geom_density(aes(x=pr.16.int)) + geom_density(aes(x=TDUM)) + theme_bw()
+
+data.frame(dd.gpa.v2.mcmc) %>% gather("variable", "n", 1:9) %>% ggplot() + 
+  geom_density(aes(x = n, fill = variable), alpha = .4) + 
+  geom_vline(xintercept = 0, alpha = .5) + 
+  facet_wrap(~variable, scales = "free") +
+  theme_bw()
+
+```
+
+```{r, echo=FALSE, include=FALSE}
+# dd analysis with covariates Credits Attempted 
+dd.ca.v2 <- lm(pan.data$CREDITS_ATT ~ pan.data$TDUM + pan.data$prom.paid + pan.data$pr.16.int + 
+                  pan.data$white + pan.data$TERM_AGE + pan.data$GEN + pan.data$CUM_GPA)
+
+dd.ca.v2.mcmc <- MCMCregress(CREDITS_ATT ~ TDUM + prom.paid + pr.16.int + white + TERM_AGE + GEN + CUM_GPA, data = pan.data, marginal.likelihood = c("none"))
+
+data.frame(dd.ca.v2.mcmc) %>% gather("variable", "n", 1:9) %>% ggplot() + 
+  geom_density(aes(x = n, fill = variable), alpha = .4) + 
+  geom_vline(xintercept = 0, alpha = .5) + 
+  facet_wrap(~variable, scales = "free") +
+  theme_bw()
+
+# dd analysis with covariates Credits Earned
+dd.ce.v2 <- lm(pan.data$CREDITS_EARNED ~ pan.data$TDUM + pan.data$prom.paid + pan.data$pr.16.int + 
+                  pan.data$white + pan.data$TERM_AGE + pan.data$GEN + pan.data$CUM_GPA)
+
+dd.ce.v2.mcmc <- MCMCregress(CREDITS_EARNED ~ TDUM + prom.paid + pr.16.int + white + TERM_AGE + GEN + CUM_GPA, data = pan.data, marginal.likelihood = c("none"))
+
+data.frame(dd.ce.v2.mcmc) %>% gather("variable", "n", 1:9) %>% ggplot() + 
+  geom_density(aes(x = n, fill = variable), alpha = .4) + 
+  geom_vline(xintercept = 0, alpha = .5) + 
+  facet_wrap(~variable, scales = "free") +
+  theme_bw()
+```
+
+```{r, include=FALSE, echo=FALSE}
+# simple retention model
+# non-rescaled variables
+indy <- function(x){
+  cbind(rescale(x$AGE),
+        x$GENDER,
+        x$white,
+        (x$TOTAL_CR),
+        (x$TRANS_CR),
+        (x$FALL_GPA),
+        (x$PROMISE_PAID))
+}
+
+#interaction terms matrix
+# could've used lapply here on the list created by indy instead.
+inter <- function(x, y) {
+  cbind((x$AGE)*(y),
+        x$GENDER*(y),
+        x$white*(y),
+        (x$TOTAL_CR)*(y),
+        (x$TRANS_CR)*(y),
+        (x$FALL_GPA)*(y)
+        )
+}
+
+data.full <- data %>% filter(FALL_AWARD == 0)
+
+y.full <- cbind(data.full$SPRING_ENROLLMENT)
+
+#independent variables
+X.full.iv <- indy(data.full)  
+X.full.iv <- cbind(X.full.iv, data.full$PELL_PAID, data.full$TERM_CR, data.full$FALL_FIRST)
+colnames(X.full.iv) <- c("Age", "Gender", "White", "Tot_cr", "Trans_cr", "Fall gpa", "promise", "Pell", "Term_CR", "1st sem")
+
+# interactions terms
+X.full.in <- inter(data.full, data.full$promise)
+# not adding term since it is a requirement of promise... should I add pell?
+X.full.in <- cbind(X.full.in, data.full$promise*data.full$PELL_PAID, data.full$promise*data.full$FALL_FIRST, 
+                   data.full$FALL_GPA*data.full$FALL_FIRST, data.full$TERM_CR*data.full$FALL_FIRST)
+colnames(X.full.in) <- c("age*pr", "man*pr", "whi*pr", "tot*pr", "trns*pr", "gpa*pr", "pr*pell", "pr*1st", "gpa*1st", "CR_1st")
+
+X.full <- cbind(X.full.iv[,], X.full.in[,])
+
+bma.full <- bic.glm(X.full, y.full, glm.family = "binomial")
+imageplot.bma(bma.full)
+summary(bma.full)
+bma.table <- summary(bma.full)
+
+# running logit from BayesLogit on the model that BMA picked to get distributions
+library(BayesLogit)
+X.full[is.na(X.full)] <- 0
+X.test <- X.full[,c(5,6,7,8,9,13,17)]
+X.test[is.na(X.test)] <- 0
+X.test <- cbind(1, X.test)
+logit.full <- BayesLogit::logit(y.full, X.test)
+post.logit.full <- data.frame(logit.full$beta)
+X.test.names <- c("int", "Trans_Cr", "Fall GPA", "promise", "Pell", "Term_CR", "whi*pr", "pr*pell")
+colnames(post.logit.full) <- X.test.names
+post.logit.full <- exp(post.logit.full)
+
+post.logit.full.den <- post.logit.full %>% gather("variable", "n", 1:8) %>% ggplot() + 
+  geom_histogram(aes(x = n, fill = variable), alpha = .4) + 
+  geom_vline(xintercept = 1, alpha = .5) + 
+  facet_wrap(~variable, scales = "free") +
+  theme_bw()
+
+# 2*SD for promise
+prom.coef <- mean(post.logit.full$promise) # 0.0003006222
+prom.sd <- sd(post.logit.full$promise) # 0.0002177519
+
+#lower bound
+prom.lower <- prom.coef - 2*prom.sd
+
+#higher bound
+prom.high <- prom.coef + 2*prom.sd
+```
+
+# Introduction
+
+This paper discusses the effects that the Fall 2016 Salt Lake Community College Promise program (Promise) had on GPA, credits attempted and credits earned in Fall 2016 and student retention into Spring 2017. SLCC Promise covers the cost of tuition and fees when Federal grants fall short. Eligibility depends on several factors: Utah residency, recipient of a Federal Pell Grant, full-time credit hours (12-18 hours per semester), being a degree seeking student with less than 90 attempted credit-hours, meeting with a college adviser to develop a 2-year degree plan in DegreeWorks, maintaining at least a 2.0 GPA, and completing 70% of attempted courses.
+
+Students only needed to apply for enrollment and fill out FAFSA. Upon submitting the required paperwork to the Financial Aid Office at SLCC they are automatically considered for Promise. If a student qualified for Promise the Financial Aid Office notifies the student of funds and additional requirements (DegreeWorks, etc.) via their student email.
+
+# Summary of results
+
+- Promise increased the number of credits attempted (+2.7) and earned (+2.1) in Fall 2016.
+- Increased course load *did not* have a negative impact on Promise students' term GPA. 
+- New Promise students are forecasted to achieve the 60-earned-credits mark a full semester faster than if they had never received Promise. 
+- There is little evidence that receiving Promise had a small positive effect on Fall 2016 to Spring 2017 retention for some students. Promise students \textit{were} already very likely to retain Fall-Spring.
+
+# Descriptive results
+
+In the 2016-17 Academic Year, 727 unique students received Promise funds.  Here is a summary of the number of students offered and paid Promise funds in each term:
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{rlrll}
+  \hline
+ & Term & Number of Students & Amount Offered & Average Offer \\ 
+  \hline
+1 & Fall 2016 & 809 & \$577,365.5 & \$713.68 \\ 
+  2 & Spring 2017 & 897 & \$638,735.5 & \$712.08 \\ 
+   \hline
+\end{tabular}
+\caption{Promise Offered} 
+\end{table}
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{rlrll}
+  \hline
+ & Term & Number of Students & Amount Offered & Average Offer \\ 
+  \hline
+1 & Fall 2016 & 533 & \$411,106.75 & \$771.31 \\ 
+  2 & Spring 2017 & 544 & \$417,464.75 & \$767.4 \\ 
+   \hline
+\end{tabular}
+\caption{Promise Paid} 
+\end{table}
+
+
+The following table shows performance differences for Fall 2016 Promise students compared to:
+1. students who were Pell eligible in Fall 2016 but did not receive promise funds.
+2. students who were not Pell eligible (and therefore were not eligible for Promise).
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{rllllll}
+  \hline
+ & Status & Retention Rate & Attempted Credits & Earned Credits & Term GPA & Completion \\ 
+  \hline
+1 & Promise & 83\% & 13.32 & 11.32 & 2.97 & NA \\ 
+  2 & Pell, no Promise & 74\% & 9.91 & 7.78 & 2.67 & NA \\ 
+  3 & No Promise, no Pell & 62\% & 8.07 & 6.22 & 2.54 & NA \\ 
+   \hline
+\end{tabular}
+\caption{Performance Differences in Fall 2016} 
+\end{table}
+
+Clearly, Promise students ouperfromed their peers.  However, without statistical analysis taking the pre-existing characteristics of students into account we can't confidently assert that Promise *caused* these performance differences.
+
+
+# Statistical Results
+
+## Impact of Promise on credits attempted and credits earned
+Both credits earned and attempted showed statistically significant increases even when controlling for year to year trends. Credits attempted because of Promise increased by 2.7 credits (+/- 0.74 at the 95% confidence interval) and credits earned increased by 2.1 credits (+/- 0.7 at the 95% confidence interval). The impacts of Promise were assessed using a difference-in-difference model (detailed  below). Demographic and academic controls were used along with trend and treatment variables. Simulation shows that *a new Promise student will reach 60 earned credit hours a full semester faster than if they had never received Promise funds and only received Pell funds (4.5 semesters vs. 5.5) and a semester and a half faster than a non-Promise non-Pell student.*
+
+## Impact of Promise on student GPA
+Promise students' GPA fell from an average of 3.3 in Fall 2015 to 3.0 in Fall 2016. This result was significant with a two-sided t-test. Simple averages do not tell the full story, however, since controls for a potential fall in non-Promise student GPA over the same period of time need to be considered. Progressing from introductory or remedial courses to more advanced courses could potentially reduce student GPA over time and still be a sign of progress. When applying appropriate controls there appears to be no significant negative effect of Promise on student GPA when controlling for the trend of all students enrolled in Fall 2015 and Fall 2016. The decrease in average GPA from 3.3 to 3.0 was not isolated to Promise recipients and thus is not an effect of Promise.
+
+## Impact of Promise on Fall 2016 to Spring 2017 retention
+The Fall 2016 Promise students were retained to Spring 2017 at a very high level, 83%. Pell only students retained at 76% and non-Pell qualifying students retained at 62%. However when other characteristics of student retention were controlled for such as demographics and GPA for the control group the difference in Promise to Pell retention rates cannot be said to be caused by Promise funds.
+
+The impacts of Promise on retention were evaluated using three methods for causal analysis: Bayesian Model Averaging (BMA), Markov Chain Monte Carlo (MCMC) and propensity score matching. All of these methods estimated small positive impacts on retention caused by Promise. However, none of these estimates were clearly non-zero (estimated confidence intervals included 0 and negative predicted values, and thus were not statistically significant).  
+
+<!-- Many controls were used in the statistical models to better isolate Promise's impact on retention. Demographics (age, gender, racial/ethnic minority) were controlled for along with total credits, transfer credits, term credit, Fall 2016 GPA, a flag for first semester students and Pell received.\footnote{Pell award and term credit might be seen as problematic since they are critical to Promise. Several models were run that did not included them or attempted to transform them into a less problematic form. None of these transformations produced "better" retention results than what is presented in this paper.} All of the control variables were interacted with Promise to ensure that Promise's impacts were not being picked up by and mistakenly associated with these other control variables since many of the control variables are associated with Promise's requirements. -->
+
+<!-- The two methods were split on whether the amount of promise funds given to a student had an effect. BMA estimated the amount of promise a student received had a very low and probably zero effect on retention. The conclusion one would draw from this methodology would be that the amount of Promise funds given to a student \textit{did not} help predict their return the following semester. However, Bayesian logistic regression, using the model BMA picked\footnote{Description of this process in the methodology section.} shows a small consistent positive impact for the amount of promise funds given to a student on retention. What this mixed result means for the Promise program is that receiving Promise funds alone does not seem to increase a student's likelihood to re-enroll at SLCC. There is weak evidence overall that the amount of Promise funds received has a small impact on retention, i.e. the more Promise funds a student received in Fall 2016 the more likely they were to return in Spring 2017.  -->
+
+# Discussion
+
+Promise incentivizes students to complete more credits in a term without having a detrimental impact on GPA, and thus will have a potentially large effect on credit accumulation for the students in the program.  Promise is not, however, a retention program.  Why? One of Promise's core criteria is that a student be Pell eligible.  But SLCC already retains over 75% of its Pell students. Consequently, there is not much room to improve retention for these students.  And given the relatively small number of students involved in Promise it would take very large changes in retention to impact the overall retention rate at SLCC. But we see only very small changes.
+
+As currently designed, the Promise program may have limited appeal to Pell students.  They are already receiving financial support, and if that support is not enough to convince them to re-enroll then the Promise award is unlikely to make a difference.  Promise could potentially convince students to postpone transferring.\footnote{Currently there is not enough qualitative analysis of SLCC early transfer(outs) to know the reason they leave is tuition and fees or for some other reasons.} However, since SLCC is currently the most affordable option for college in Salt Lake County it is unlikely students would transfer for financial reasons. For these reasons, the program may therefore remain relatively small
+
+Money is not the only  factor in student persistance, especially for non-traditional students. If, due to your work schedule, you have to take night classes, how could you take more than 9 credit hours a semesters? At the very least it would be difficult to take 12 credit hours of classes in your major at night for multiple semesters. We know that "classes at the wrong time of day" is a major problem cited by SLCC students.\footnote{Survey results from spring 2017.} Many SLCC students might be interested in a Promise award but lack the flexibility to enroll in an extra class. Promise tuition waivers are not a substitute for a full-time or even most part-time jobs. A lot of jobs don't allow you to fine tune the amount of hours you work and when those hours are. A student might correctly judge that taking 12-16 hours (to meet Promise's requirements) is too much of a commitment in addition to working, family responsibilities and other aspects of life they give priority to. Given the high number of SLCC students who have to work this might be a large road block in the path to increasing the number of students who take advantage of Promise. 
+
+Promise lowers the financial burden of college but SLCC is already a cheap option and potentially not the most significant financial commitment in a student's life. The average amount of promise funds paid to a student was $771 and the maximum was $1546. for some students that may not be enough---in addtion to their current Pell award--- to justify the extra commitment and rescheduling of life that would be required to qualify for Promise (12 credit hours) or put off other academic interests, such as early transfer. Financially, it might be more useful to forgo Promise and just keep taking 6-9 credit hours a semester if that allows you to maintain the work hours required to pay for other necessities. Students increased their course load by approximately one course a semester but typically not by two plus courses. 
+
+# Technical details: data preparation and analytical methodology
+
+## Data preparation
+For the difference-in-difference models students who were enrolled in both Fall 2015 and Fall 2016 were used for comparisons (11,125 students). This allowed for additional controls to be placed on these models and further isolate the impacts of Promise. For the logistic regressions run to answer questions about retention the data were limited to Fall 2016 students who 1) did not receive an award in Fall 2016, 2) recorded a GPA in Fall 2016, and 3) had a record for demographic information on gender and ethnicity (21,350 students).   
+
+There were 235 \textit{future} Promise students enrolled in SLCC in Fall 2015\footnote{These are the students who would go on to receive Promise in Fall 2016.} a year prior to the start of Promise. Focusing on these students allows for comparisons of their college behavior before and after Promise for questions relating to academic performance and credits taken per semester. To separate the trend from the treatment effects for Promise students a difference-in-difference model (DiD) was used for analyzing the impact of Promise on GPA, credits attempted and earned. Various demographic and academic controls were used within the DiD model to isolate the impact of Promise. DiD analysis sheds light on how Promise students have potentially changed because of the implementation of the program. Two DiD models were estimated with both frequentist and Bayesian linear regressions. Further data preparation for the propensity score matching model will be discussed later. 
+
+## Difference in difference model: GPA
+
+To evaluate the impact of Promise on student Fall 2016 GPA a difference-in-difference model was used (Angrist and Pischke 2009). To evaluate the impact on Promise student's GPA, all SLCC students who were enrolled in both Fall 2015 and Fall 2016 were included.  When controlling for the "trend" in GPA (what non-promise student GPAs did) the difference-in-difference model showed no significant negative impact of Promise on GPA. It appears that students enrolled in both Fall 2015 and Fall 2016 had their GPAs decline and so the 3.3 to 3.0 average decline for promise students wasn't a result of Promise. The full model results are summarized in Table 1. 
+
+## Difference in difference model: Credits attempted and earned
+
+The methodology used to evaluate the impact Promise had on student credits attempted and earned is identical to that used for GPA. A difference-in-difference model was used to isolate treatment from trend. The DiD model for both credits earned and attempted find a statistically significant increase due to promise. The estimated effect of Promise on credits attempted was a 2.724 (0.355) increase for promise students compared to other students. For credits earned there is an estimated increase of 2.111 (0.372) as a result of the Promise program. Both results are statistically significant. Both models' results are summarized in Table 1. 
+
+```{r, include=FALSE, echo=FALSE}
+library(stargazer)
+stargazer(dd.gpa.v2, dd.ca.v2, dd.ce.v2, caption = "Difference-in-difference models", no.space = TRUE, covariate.labels=c("Trend", "Promise students", "Promise effect", "White", "Term age", "Gender(male)", "Credits atttempted", "Cummulative GPA", "Intercept"))
+```
+
+\begin{table}[!htbp]  
+  \caption{Difference-in-difference models} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-4} 
+\\[-1.8ex] & change in GPA & Credits attempted & Credits earned \\ 
+\\[-1.8ex] & (1) & (2) & (3)\\ 
+\hline \\[-1.8ex] 
+ Trend & $-$0.269$^{***}$ & $-$0.592$^{***}$ & $-$0.757$^{***}$ \\ 
+  & (0.01) & (0.05) & (0.06) \\ 
+  Promise students & 0.049 & 1.786$^{***}$ & 1.930$^{***}$ \\ 
+  & (0.07) & (0.25) & (0.26) \\ 
+  Promise effect & $-$0.077 & 2.724$^{***}$ & 2.111$^{***}$ \\ 
+  & (0.09) & (0.36) & (0.37) \\ 
+  White & 0.076$^{***}$ & $-$0.470$^{***}$ & $-$0.264$^{***}$ \\ 
+  & (0.01) & (0.06) & (0.06) \\ 
+  Term age & $-$0.007$^{***}$ & $-$0.132$^{***}$ & $-$0.111$^{***}$ \\ 
+  & (0.00) & (0.00) & (0.00) \\ 
+  Gender(male) & 0.023$^{*}$ & 0.015 & $-$0.022 \\ 
+  & (0.01) & (0.05) & (0.06) \\ 
+  Credits attempted & 0.029$^{***}$ &  &  \\ 
+  & (0.00) &  &  \\ 
+  Cumulative GPA &  & 0.417$^{***}$ & 2.094$^{***}$ \\ 
+  &  & (0.03) & (0.04) \\ 
+  Intercept & $-$0.202$^{***}$ & 11.578$^{***}$ & 4.453$^{***}$ \\ 
+  & (0.03) & (0.13) & (0.14) \\ 
+ \hline \\[-1.8ex] 
+Observations & 21,704 & 21,704 & 21,704 \\ 
+R$^{2}$ & 0.043 & 0.113 & 0.189 \\ 
+Adjusted R$^{2}$ & 0.042 & 0.113 & 0.189 \\ 
+Residual Std. Error (df = 21696) & 0.978 & 3.807 & 3.984 \\ 
+F Statistic (df = 7; 21696) & 138.542$^{***}$ & 396.107$^{***}$ & 724.087$^{***}$ \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{3}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+## Retention models 
+BMA was the primary statistical method used to model Fall to Spring retention initially. BMA is a robust methodology that provides robust estimated values of variables for a variety of regression based methodologies. Since retention is a yes or no variable (Did the student enroll in the next semester?), a logistic modeling methodology was used.  BMA more accurately captures the uncertainty associated with statistical modeling than most other statistical methodologies. BMA evaluates all possible models given the data set\footnote{2,097,152 models for this study.} and then provides a weighted average estimate for the independent variables based on the probability of the sub-models. This method directly takes into consideration model uncertainty and also provides the tools for analysis of this model uncertainty. Almost all other methodologies completely ignore model uncertainty or perform specification searches that are not documented or transparent. 
+
+### Robustness: Retention
+Ignoring model uncertainty can dramatically under estimate the uncertainty of the statistical results generated. Specification searches introduce bias and leads to over-fitting models\footnote{Including more "explanatory" variables than should be in the model. Over-fitting often leads to the illusion of a better fit and obscures "true" effects. Documented in Wang, Zhang \& Bakhai 2004.}. This may explain why BMA finds the interaction term (promise*promise) to have next to no effect and likely not a variable that should be included in the final model, while Bayesian logistic regression\footnote{Just one model specification, no averaging.} finds it to have a small positive effect. BMA rewards parsimony in models and thus often will produce sparse models, indeed, null models are not uncommon.
+
+Robustness refers to a parameter's ability to maintain statistical significance while other elements of the model and data are changing. The estimated value of a variable is similar across the model space: plugging in a covariate or taking one out does not effect the estimated value. BMA confronts the desire for robust parameter estimates by considering all model specification and using all of that information through weighted averaging to generate parameter estimates.
+
+## BMA results: Retention
+Figure 1 displays the image plot of the BMA for retention. Red indicates a positive effect of the variable on the outcome (retention), blue indicates a negative effect on the outcome, and the beige color indicates the variable was not included. BMA considers all possible models\footnote{For averaging, only the first 150 models are used by default. For this study, BMA found 11 models with sufficient explanatory power.}, shown along the x-axis. The first model (labeled 1 on the x-axis) contained three variables indicated by the three red bars in the first column (Fall GPA, Term credits, and Pell received). These three variables were included in all the models with significant explanatory power, providing strong evidence as to their impact on Fall 2016 to Spring 2017 retention. The amount of explanatory power an individual model possesses is visually indicated by the bar length on the x-axis. Model 1 has the highest posterior probability of being the "true" model as indicated by its length on the x-axis (this is a visual representation of the weight placed on an individual variable in the averaging process).  
+
+![The image plot of the BMA for retention. Red indicates a positive effect of the variable on the outcome (retention), blue indicates a negative effect on the outcome, and the beige color indicates the variable was not included. BMA considers all possible models, shown along the x-axis. The first model (labeled 1 on the x-axis) contained three variables indicated by the three red bars in the first column (Fall GPA, Term credits, and Pell recived). These three variables were included in all the models with significant explanatory power, providing strong evidence as to their impact on Fall 2016 to Spring 2017 retention. The amount of explanatory power an individual model posesses is visually indicated by the bar length on the x-axis. Model 1 has the highest posterior probability of being the "true" model as indicated by its length on the x-axis (this is a visual representation of the weight placed on an individual variable in the averaging process). Source: Banner data, BMA package R (Raftery, Hoeting, Volinsky, Painter, & Yeung)](promise_plots/bma_full.png)
+
+Besides Fall GPA, Term credits and Pell award, no other variables had a strong impact on retention (as indicated by the fact they are not picked in most models.). The \textit{Promise}\*\textit{Pell} (pr.pell) interaction variable in Figure 1 is showing signs of a "bad" variable as it has a different sign in different models, positive in one model and negative in two. The \textit{promise} term has a probability of inclusion of only 13.8\% (86.2\% probability that \textit{promise} has zero effect). To have weak evidence, the probability would have to be over 50\%. Interacting variables (multiplying them together) allows for an analysis of variables that might have a compounding impact on each of the variables or whether one variable's relationship with the outcome variable depends on the levels of the second variable. Since Promise requires the student to be receiving Pell funds the interaction needs to be included in the model to disentangle Promise and Pell impacts. Promise will be interacted on most of the independent variables in the study.
+
+The \textit{Promise}\*\textit{Promise} (pr.pr) interaction term has a similar result with a probability of inclusion of only 18.4\%. All the .pr terms represent the interaction terms, these are independent variables multiplied by promise. Again, interacting terms further isolates the effects of each variable. Interacting \textit{promise} on \textit{promise} will isolate the effect of the amount of promise given to students.
+
+<!-- Since BMA is a Bayesian methodology a 'prior' had to be included. Priors usually represent all the prior information one has before the current study is performed represented in a probability statement about all elements of the model. Null priors were used for the retention study. Null priors were selected for two reasons: first Fall 2016 was the first time Promise funds were distributed so there was not a "baseline" for the data we had, second retention is known to be fairly hard to predict indicating a large amount of uncertainty. Since there was no previous information closely matching this retention study data and a large amount of uncertainty, the parameters of the model were given equal weight of inclusion with "flat" priors centered at zero. We don't have strong beliefs  (flat) as to what the impact of any variable is (centered at zero).  -->
+
+## Bayesian logistic regression: Retention
+In order to more clearly understand the probability distributions for variables with any explanatory power a second analysis was performed. The independent variables from the BMA (all the variables that had any color in Figure 1\footnote{Variables that had any explanatory power.}) were placed into a Bayesian logistic regression as a model. This is more similar to the type of study that would be performed for this type of question others may have performed.\footnote{The type of statistical modeling that would have you ignore model uncertainty.} From this regression the probability distributions in Figure 2 (below) are generated. Given the way the data was transformed (odds ratios) for this analysis the value 1 on the x-axis represents no effect for the individual variable (indicated by the vertical line). Values greater than 1 represent a positive effect on retention and values less than 1 represent a negative effect on retention. These distributions were generated using a Markov Chain Monte Carlo simulation, where the posterior distribution is created by drawing from data 1000 times\footnote{This is similar to thinking about determining if a coin is 'fair' by flipping a model based on the observations of that coin 1000 times.}. 
+
+![Posterior distributions for variables included in the Bayesian logistic regression. The vertical line indicates 1 on the x-axis or 1:1 odds (no impact). Posterior distributions that are completely to the right of the vertical line have a clear positive impact according to the model (Fall GPA, Pell, Term credits, and just barely pr*pr). All other variable posterior cross the vertical line indicating a large amount of uncertainty of the effect of these variables (it is not even clear if they have a positive or negative impact on retention).](promise_plots/logit_hist.png)
+
+
+## Propensity Score mathching
+A third study was conducted to validate the BMA and Bayesian logit model results. This study used data that was pulled separately from the data for both the BMA and Bayes logit. Propensity score matching was used to synthetically create control groups to compare the promise students too. Propensity scoring methods are meant to mimic the behavior of a controlled experiment. The 'treated' group (Promise students) need to be compared to students who, but for randomness, could have been treated. 
+
+All students who were Pell eligible in the Fall 2016 semester were scored based on previous academic, demographic and course taking behavior.\footnote{The treatment model used a generalized boosted model for classification.} Once these scores were generated, students were matched first by exactly grouping promise students and potential control student based on their entry cohort term. Second, the students were then paired to a minimum of one student from the control set based on their propensity score.\footnote{Matching on the propensity scores was calipered to less than or equal to .25 standard deviations. This means that propensity scores were not matched to one another unless they were within .25 standard deviation from each other. If scores failed to meet this criteria they were excluded since no acceptable match could be found (Rosenbaum and Rubin 1985).} Finally, retention in Spring 2017 for the two student groups (treated by reviving promise funds vs. synthetic control) were compared to each other and Abadie-Imbens bias corrected standard errors and p-values were used to establish statistical significance of the effect.\footnote{Abadie and Imbens 2002.} 
+
+### Continuing students in Fall 2016
+This sub group consists of students who had a minimum term less than Fall 2016 and were Pell eligible in Fall 2016. These students were enrolled at SLCC for at least one term prior to Fall 2016. There were 3889 students who fell into this subgroup with 283 promise students (table 2). There were 15 students in this subgroup who could not be matched because their minimum term of enrollment at SLCC did not contain a suitable match in the control observations.\footnote{If there were no students in the control who had the same starting term at SLCC the promise student would not find a match. If there were students in the control who had the same starting term at SLCC but their propensity scores were more than 0.25 standard deviations away from the promise student, the promise student would not find a match.} 268 promise students were able to find adequate matches. The propensity score matching used for this study allowed for replacement of controls and for a promise student to match to more than one control. This lowers potential bias by allowing the model to synthetically recreate a promise student in the aggregate but slows down the programs run time. When the matching generates more than one match for a promise student weights are applied algorithmically to avoid oversampling and biasing the group estimate (re-balancing the multiple matches to have the weight of just one observation). This potential bias is why Abadie and Imbens bias corrected standard errors and p-values were used in this study. These students' propensity scores were calculated using 17 base variables.\footnote{Table of variables and descriptions is in the appendix.}
+
+### First time students Fall 2016 with no higher education academic records
+This sub group consists of students who were Pell eligible and in their first term at SLCC with no prior college level GPA records. 1602 students were included in this group with 135 of them being Promise students (table 2). Due to this subgroup's paucity of matching variables (7) associated with the lack of any prior college level academic records, exact matching on 5 digit zip code was implemented. Matching on 5 digit zip code attempts to isolate some socio-economic factor beyond the students basic demographics. Since it is not known how this student group will perform in college this methodology of exact matching attempts to control for as many background factors as possible. Keep this in mind, the Continuing student group matches are the best since the propensity scores and exact matching data are the most robust for that group. 
+
+### First time students Fall 2026 with higher education academic records
+This subgroup consists of students who are Pell eligible and in their first term at SLCC but have prior GPA and credits earned. There are only 440 students in this group with 52 being promise students (table 2). Of the 52 promise students 51 were able to find a synthetic match with one promise student being dropped due to no control group propensity score being within 0.25 standard deviations. This subgroup's propensity scores were generated using the same 17 variables available for the continuing students, however they are not as robust as the continuing subgroup but from an academic controls perspective more robust than the first time no record students.
+
+```{r, echo=FALSE, include=FALSE}
+Nc <- 3889
+Nt <- 283
+Mo <- 268
+Moun <- 409
+drop <- 15
+Estimate <- 0.061
+AISE <- 0.032
+AI_p.val <- 0.056
+cs_gpa_est <- rbind(Estimate, AISE, AI_p.val, Nc, Nt, Mo, Moun, drop)
+
+Nc <- 440
+Nt <- 52
+Mo <- 51
+Moun <- 67
+drop <- 1
+Estimate <- -0.108
+AISE <- 0.056
+AI_p.val <- 0.052
+ff_gpa_est <- rbind(Estimate, AISE, AI_p.val, Nc, Nt, Mo, Moun, drop)
+
+Nc <- 1602
+Nt <- 135
+Mo <- 110
+Moun <- 162
+drop <- 25
+Estimate <- 0.035
+AISE <- 0.043
+AI_p.val <- 0.406
+ff_nogpa_est <- rbind(Estimate, AISE, AI_p.val, Nc, Nt, Mo, Moun, drop)
+
+results <- cbind(cs_gpa_est, ff_nogpa_est, ff_gpa_est)
+colnames(results) <- c("Continuing students |", "No record first term |", "Record first term")
+rownames(results) = c("Estimate", "A.I. Std Er", "A.I. p-value", "Original observations", "Org. treated observations", "Matched observations", "Matched obs. (unweighted)", "Dropped obs. (couldn't match)")
+
+
+```
+
+
+```{r, echo=FALSE}
+knitr::kable(results[4:8,], caption = "Propensity score matching group properties")
+```
+
+
+
+## Propensity score results
+
+Table 3 below shows none of the subgroups showed clear and strong evidence in favor of a Spring 2017 Promise retention effect. There are however two results worth noting. First for continuing students the estimated effect of Promise on retention was 6% which is not far from the 8% that BMA estimated. The consistency seems encouraging but BMA, Bayes Logit and the propensity score model do not attribute statistical significance to this estimate. In other words, none of the three methodologies can clearly say the effect of Promise on retention wasn't zero. The propensity score model estimate was closer to crossing the arbitrary "significance" threshold used for casual analysis but still fell short. For continuing students the effect of Promise on retention was likely small and statistical modeling finds difficulty assigning strong causality to Promise. 
+
+Second, for first term students with college level academic records a similarly 'close to statistically significant' result for the -11% estimate was found. This is deceiving though since this is the smallest subgroup and the results are likely very volatile to sample size. This subgroup was analysed by exact matching on five digit zip in a seperate analysis which produced a zero estimate but with a substantially less reliable, smaller observation set. 
+
+Finally for the first term students with no prior college level academic records the estimate is far from significantly different than zero and we must therefore conclude there is no retention effect. Part of this might be the difficulty in creating a "good" synthetic control for these students with little academic control data available. 
+
+```{r, echo=FALSE}
+knitr::kable(results[1:3,], caption = "Propensity score matching estimated effects")
+```
+
+## Conclusions from all three methodologies: Retention
+It is clear from the three methodologies that there is no clear Spring 2017 retention effect due to Promise in Fall 2016. There is some very weak evidence that there might have been something, probably positive and probably small. This weak evidence the retention effect is different than zero is in both the Bayesian Logit model (figure 2) and the propensity score matching model for one of the three subgroups (table 3), \textit{emphasis on the weak evidence.} 
+
+
+### BMA output summary
+
+```{r, echo=FALSE, include=FALSE}
+stargazer(bma.table, font.size = "small", notes.align = "l", 
+          covariate.labels = c("Intercept", "Age", "Gender(male)", "White", "Total Credits", "Transfer crs.", 
+                               "Fall GPA", "Promise paid", "Pell Paid", "Term crs.", "First Semester", "Pr.age",
+                               "Pr.male", "Pr.white", "Pr.total.crs", "Pr.trans.crs", "Pr.GPA", "Pr.Pell", "Pr.1st",
+                               "GPA.1st", "Term crs.1st"))
+```
+
+\begin{table}[!htbp] \centering 
+  \caption{BMA model: Retention} 
+  \label{} 
+\small 
+\begin{tabular}{@{\extracolsep{5pt}} ccccccccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & p!=0 &  EV & SD & model 1 & model 2 & model 3 & model 4 & model 5 \\ 
+\hline \\[-1.8ex] 
+Intercept & 100 &  1.31029 & 0.04050 &  1.306e+00 &  1.316e+00 &  1.298e+00 &  1.360e+00 &  1.307e+00 \\ 
+Age &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+Gender &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+White &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+Total crs &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+Transfer crs &  21.2 & -0.04041 & 0.08478 &      . &      . & -1.911e-01 &      . & -1.881e-01 \\ 
+Fall GPA & 100.0 &  1.74162 & 0.06845 &  1.743e+00 &  1.732e+00 &  1.758e+00 &  1.724e+00 &  1.747e+00 \\ 
+Promise &  29.1 &  0.08491 & 0.22128 &      . &  1.332e-01 &      . &  8.217e-01 &  1.314e-01 \\ 
+Pell & 100.0 &  0.39715 & 0.11289 &  3.527e-01 &  4.952e-01 &  3.376e-01 &  4.654e-01 &  4.779e-01 \\ 
+Term crs & 100.0 &  0.76133 & 0.12863 &  8.128e-01 &  6.502e-01 &  8.284e-01 &  6.826e-01 &  6.683e-01 \\ 
+1st sem &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+age*Pr &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+male*Pr &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+white*Pr &   4.8 &  0.01909 & 0.09563 &      . &      . &      . &      . &      . \\ 
+tot*Pr &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+trns*Pr &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+GPA*Pr &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+Pr*Pell &  10.8 &  0.26276 & 1.18867 &      . &      . &      . &  4.278e+00 &      . \\ 
+Pr.1st &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+GPA*1st &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+Term crs*1st &   0.0 &  0.00000 & 0.00000 &      . &      . &      . &      . &      . \\ 
+ &  &  &  &  &  &  &  &  \\ 
+nVar &  &  &  &    3 &    4 &    4 &    5 &    5 \\ 
+BIC &  &  &  & -4.976e+04 & -4.976e+04 & -4.976e+04 & -4.976e+04 & -4.976e+04 \\ 
+post prob &  &  &  &  0.461 &  0.170 &  0.159 &  0.067 &  0.053 \\ 
+\hline \\[-1.8ex] 
+\end{tabular} 
+\end{table} 
+
+Table 2 above displays the raw BMA logistic regression output. Estimated values (EV) and standard deviations (SD) are in log-odds ratio format. p!=0 provides the probability that the variable is non-zero and should be included in the model. Most variables lack 'robustness' and therefore are not included or have a p!=0 score well below 50\%.
+
+\newpage
+### Propensity score matching variables and definitions
+
+```{r, echo = FALSE}
+variables <- readxl::read_xlsx("ps_variable_desc.xlsx")
+knitr::kable(variables[1:28,1:5])
+```
+
+\newpage
+### Histograms of Propensity Score matches
+
+![Histogram of propensity scores for continuing students in Fall 2016 matched sample. Yellow bars are for controls and blue boxes are for promise students.](cs_gpa.png)
+
+![Histogram of propensity scores for first time students with no college level records in Fall 2016 matched sample. Yellow bars are for controls and blue boxes are for promise students.](ff_nops_plot.png)
+
+![Histogram of propensity scores for first time students with college level records in Fall 2016 matched sample. Yellow bars are for controls and blue boxes are for promise students.](ff_ps_plot.png)
+
+
+
+
+```{r, echo=FALSE, include=FALSE, eval=FALSE}
+promise.pan.16 %>% filter(PROMISE_PAID > 0) %>% ggplot() + geom_histogram(aes(x=CUM_GPA)) + theme_minimal()
+promise.pan.16 %>% filter(PROMISE_PAID > 0) %>% ggplot() + geom_histogram(aes(x = TERM_GPA)) + theme_minimal()
+promise.pan.15 %>% filter(PROMISE_PAID > 0) %>% ggplot() + geom_histogram(aes(x=TERM_GPA)) + theme_minimal()
+
+promise.pan.16 %>% filter(PROMISE_PAID > 0) %>% ggplot() + geom_histogram(aes(x=CREDITS_ATT)) + theme_minimal() #one student attempted only 9 credits and still recieved $412 in promise funds. pidm <- 512305.
+promise.pan.16 %>% filter(PROMISE_PAID > 0) %>% ggplot() + geom_histogram(aes(x=CREDITS_EARNED)) + theme_minimal()
+
+fail.data <- read_csv("20170412_promise_update.csv")
+fail.data$PIDM <- as.factor(fail.data$T_PIDM)
+fail.data.201640 <- fail.data %>% filter(ENROLL_TERM == 201640) 
+fail.data %>% filter(ENROLL_TERM == 201640) %>% ggplot() + geom_histogram(aes(x = CREDITS_WITHDRAWN)) + theme_minimal()
+fail.data %>% filter(ENROLL_TERM == 201540) %>% ggplot() + geom_histogram(aes(x = CREDITS_WITHDRAWN)) + theme_minimal()
+fail.data %>% filter(ENROLL_TERM == 201440) %>% ggplot() + geom_histogram(aes(x = CREDITS_WITHDRAWN)) + theme_minimal()
+
+fail.data %>% filter(ENROLL_TERM == 201640) %>% ggplot() + geom_histogram(aes(x = CREDITS_FAILED)) + theme_minimal()
+fail.data %>% filter(ENROLL_TERM == 201540) %>% ggplot() + geom_histogram(aes(x = CREDITS_FAILED)) + theme_minimal()
+fail.data %>% filter(ENROLL_TERM == 201440) %>% ggplot() + geom_histogram(aes(x = CREDITS_FAILED)) + theme_minimal()
+
+promise.pan.16 %>% filter(PROMISE_OFFERED > 0 & is.na(PROMISE_PAID) == T) %>% ggplot() + geom_histogram(aes(x=CREDITS_ATT))
+promise.pan.16 %>% filter(PROMISE_OFFERED > 0 & is.na(PROMISE_PAID) == T & CREDITS_ATT > 11) %>% dim()# 81
+promise.pan.16 %>% filter(PROMISE_OFFERED > 0 & is.na(PROMISE_PAID) == T & CREDITS_ATT < 12) %>% dim()# 41
+not.accepted.ft <- promise.pan.16 %>% filter(PROMISE_OFFERED > 0 & is.na(PROMISE_PAID) == T & CREDITS_ATT > 11)
+not.accepted <- left_join(not.accepted.ft, fail.data.201640, by = "PIDM")
+
+summary(not.accepted) # I think something is off with this group. I don't think they should have ever been offered promise for the most part.
+
+not.accepted %>% filter(FAFSA == 1) %>% summary()
+
+promise.pan.16$prdum <- ifelse(promise.pan.16$PROMISE_PAID > 0 , 1, 0)
+promise.pan.16 %>% ggplot() + geom_density(aes(x=TRANS_CRED, col = prdum == 1), alpha = .6) + 
+  theme_bw() + 
+  labs(x = "Transfer Credit",
+       title = "Transfer Credits Promise students vs. non-Promise",
+       caption = "") +
+  theme(plot.caption = element_text(hjust =0))
+
+promise.pan.16$TRANS_CRED[is.na(promise.pan.16$TRANS_CRED) == T] <- 0
+iaj <- promise.pan.16 %>% filter(PROMISE_PAID > 0)
+mean(iaj$TRANS_CRED) #promise students had an average of 2.302128 transfer credits
+sd(iaj$TRANS_CRED) # SD 6.799179 for promise transfer students
+
+adf <- promise.pan.16 %>% filter(is.na(PROMISE_PAID) == T)
+mean(adf$TRANS_CRED) #non-proimse students had an average of 2.1382 TC
+sd(adf$TRANS_CRED) #SD 6.546373 for non-promise TC
+
+trans.t <- t.test(iaj$TRANS_CRED, adf$TRANS_CRED) #not significant but not normally distributed. 
+shapiro.test(iaj$TRANS_CRED)
+```
+
+```{r, include=FALSE, echo=FALSE, eval=FALSE}
+data.full <- data %>% filter(FALL_AWARD == 0 & TERM_CR > 5) #promise depends on TERM_CR
+data.full[is.na(data.full) == TRUE] <- 0
+y.full <- cbind(data.full$SPRING_ENROLLMENT)
+
+
+X.full.iv <- indy(data.full)  
+X.full.iv <- cbind(X.full.iv, data.full$PELL_PAID, data.full$FALL_FIRST)
+colnames(X.full.iv) <- c("Age", "Gender", "White", "Tot_cr", "Trans_cr", "Fall gpa", "promise", "Pell",  "1st sem")
+
+# interactions terms
+X.full.in <- inter(data.full, data.full$promise)
+# not adding term since it is a requirement of promise... should I add pell?
+X.full.in <- cbind(X.full.in, data.full$promise*data.full$PELL_PAID, data.full$promise*data.full$FALL_FIRST, 
+                   data.full$FALL_GPA*data.full$FALL_FIRST)
+colnames(X.full.in) <- c("age*pr", "man*pr", "whi*pr", "tot*pr", "trns*pr", "gpa*pr", "pr*pell", "pr*1st", "gpa*1st")
+
+X.full <- cbind(X.full.iv[,], X.full.in[,])
+
+
+bma.full <- bic.glm(X.full, y.full, glm.family = "binomial")
+imageplot.bma(bma.full)
+summary(bma.full)
+
+```
+
+```{r, include=FALSE, echo=FALSE, eval=FALSE}
+library(plotly)
+BC.major <- data.full %>% group_by(MAJOR, promise) %>%
+  tally() %>% 
+  ggplot() + geom_point(aes(y = MAJOR, x = log(n), color = as.factor(promise))) + 
+  guides(color = "none") + 
+  theme_minimal()
+
+ggplotly(BC.major, height = 2500, width = 700)
+
+trim.major <- data.full %>% 
+  filter(promise == 1) %>% 
+  group_by(MAJOR) %>% 
+  tally() %>% 
+  select(MAJOR) #67 major for the data.full promise students... non-completers
+
+# data.full %>% group_by(MAJOR) %>% tally() %>% select(MAJOR) %>% dim #156 majors in data.full
+# filter joining on trim.major
+
+trim.data <- data.full %>% inner_join(trim.major, by = "MAJOR") # drops 1196
+
+# checking other covariates
+# gender higher proportion of women in promise
+p.m <- trim.data %>% filter(promise == 1, GENDER == 1) %>% dim() 
+p.f <- trim.data %>% filter(promise == 1, GENDER == 0) %>% dim()
+p.m/p.f  #0.834507
+
+np.m <- trim.data %>% filter(promise == 0, GENDER == 1) %>% dim()
+np.f <- trim.data %>% filter(promise == 0, GENDER == 0) %>% dim()  
+np.m/np.f #0.9348867
+
+
+# age by gender looks good
+trim.data %>% group_by(promise) %>% 
+  select(promise, GENDER, MAJOR, AGE, ETHNICITY) %>%
+  ggplot() + geom_density(aes(AGE, col = as.factor(GENDER))) +  
+  theme_minimal() + 
+  facet_wrap(~ETHNICITY)
+
+
+# would like to match on age, ethnicity, gender. also need to consider
+# credit hours
+
+# this will be easy to match on but maybe invalid
+trim.data %>% ggplot() + 
+  geom_density(aes(TOTAL_CR, col = as.factor(promise))) + 
+  theme_minimal() + 
+  facet_wrap(~ETHNICITY, scales = "free")
+
+# this will be hard to match on maybe invalid
+trim.data %>% ggplot() + 
+  geom_density(aes(SLCC_CR, col = as.factor(promise))) + 
+  theme_minimal() + 
+  facet_wrap(~ETHNICITY, scales = "free")
+
+# this will be hard to match on but valid
+trim.data %>% ggplot() + 
+  geom_density(aes(TRANS_CR, col = as.factor(promise))) + 
+  theme_minimal() + 
+  facet_wrap(~ETHNICITY, scales = "free")
+
+```
+
+```{r, eval=FALSE, include=FALSE}
+# random code bits
+
+# ### subsets that won't get used for data analysis but for maps and subseting later
+# # just promise students
+# promise.students <- data %>% filter(PROMISE_PAID > 0) 
+# 
+# # just pell but not promise students, full-time.
+# pell.only.students <- data %>% filter(PELL_ELIG == "Y" & TERM_CR > 11 & is.na(PROMISE_PAID) == TRUE) 
+# 
+# # no pell or promise
+# nada.students <- data %>% filter(is.na(PELL_ELIG) == TRUE & TERM_CR > 11) 
+# 
+# #this subset focuses on all students that are either full pell, promise or promise-non-receivers.
+# focus.1 <- data %>% filter(PELL_ELIG == "Y" & TERM_CR > 11) 
+# 
+# #this subset focuses on full time non-pell eligable students and promise students.
+# focus.2 <- data %>% filter(is.na(PELL_ELIG) == TRUE & TERM_CR > 11 | PROMISE_PAID > 0) 
+
+```
+
+```{r, eval=FALSE, include=FALSE}
+# # Moved to its own script
+# library(Matching)
+# data.full$ID <- as.factor(data.full$ID)
+# data.full$ZIP <- as.factor(data.full$ZIP)
+# 
+# match.pan <- prom.pan %>% 
+#   filter(TERM == 201640) %>% 
+#   dplyr::select(PIDM, CUM_GPA)
+# 
+# match.data <- data.full %>% 
+#   filter(PELL_ELIG == "Y" & COUNTY == "Salt Lake") %>% 
+#   left_join(match.pan, by = c("ID" = "PIDM"))
+# 
+# ################ MATCHING ON PELL AND CUMMULATIVE GPA #########################
+# # removing no cummulaitve GPA 
+# match.data.gpa <- match.data %>% filter(is.na(CUM_GPA) != T & TERM_CR > 5)
+# 
+# pscores.pell.gpa <- glm(promise ~ AGE + white + GENDER + CUM_GPA + PELL_PAID + TOTAL_CR, family = binomial, data = match.data.gpa)
+# #### logit checks
+# summary(pscores.pell.gpa)
+# 
+# #### matching
+# Tr.gpa <- match.data.gpa$promise # treatment indicator
+# Y.gpa <- match.data.gpa$SPRING_ENROLLMENT # dependent variable
+# X.gpa <- pscores.pell.gpa$fitted # Propensity scores with pell
+# 
+# rr.gpa <- Match(Y = Y.gpa, Tr = Tr.gpa, X = X.gpa, M=1, estimand = "ATT")
+# 
+# #### Balance checks
+# mb.gpa <- MatchBalance(promise ~ AGE + white + GENDER + CUM_GPA + PELL_PAID + TOTAL_CR, data = match.data.gpa, match.out = rr.gpa, nboots = 500)
+# 
+# #### results
+# summary(rr.gpa)
+# 
+# ################ MATCHING ON PELL AND NAs FOR CUMMULATIVE GPA #########################
+# # just those with NAs for CUM_GPA
+# match.data.nas <- match.data %>% filter(is.na(CUM_GPA) == T)
+# 
+# pscores.pell.nas <- glm(promise ~ AGE + white + GENDER + PELL_PAID + TOTAL_CR, family = binomial, data = match.data.nas)
+# Tr <- match.data.nas$promise # treatment indicator
+# Y <- match.data.nas$SPRING_ENROLLMENT # dependent variable
+# X <- pscores.pell.nas$fitted # Propensity scores with pell
+# 
+# rr.nas <- Match(Y = Y, Tr = Tr, X = X, M=1)
+# #### Balance checking
+# mb.nas <- MatchBalance(promise ~ AGE + white + GENDER + PELL_PAID + TOTAL_CR, data = match.data.nas, match.out = rr.nas, nboots = 500)
+# 
+# ################ MATCHING ON ZIPS AND CUMMULATIVE GPA #########################
+# # no pell just zips + cum_gpas
+# match.zips.gpa <- match.data %>% filter(is.na(CUM_GPA) != T)
+# 
+# pscores.zip.gpa <- glm(promise ~ AGE + white + GENDER + CUM_GPA + as.factor(ZIP) + TOTAL_CR, family = binomial, data = match.zips.gpa)
+# Tr.zip.gpa <- match.zips.gpa$promise
+# Y.zip.gpa <- match.zips.gpa$SPRING_ENROLLMENT
+# X.zip.gpa <- pscores.zip.gpa$fitted
+# 
+# rr.zip.gpa <- Match(Y = Y.zip.gpa, Tr = Tr.zip.gpa, X = X.zip.gpa, M=1)
+# #### Balance checking
+# mb.zip.gpa <- MatchBalance(promise ~ AGE + white + GENDER + CUM_GPA + as.factor(ZIP) + TOTAL_CR, data = match.zips.gpa, nboots = 500)
+# 
+# ################ MATCHING ON ZIPS AND NAs FOR CUMMULATIVE GPA #########################
+# # no pell just zips + no cum_gpa
+# match.zip.nas <- match.data %>% filter(is.na(CUM_GPA) == T)
+# 
+# pscores.zip.nas <- glm(promise ~ AGE + white + GENDER + as.factor(ZIP) + TOTAL_CR, family = binomial, data = match.zip.nas)
+# Tr.zip.nas <- match.zip.nas$promise
+# Y.zip.nas <- match.zip.nas$SPRING_ENROLLMENT
+# X.zip.nas <- pscores.zip.nas$fitted
+# 
+# rr.zip.nas <- Match(Y = Y.zip.nas, Tr = Tr.zip.nas, X = X.zip.nas, M=1)
+# 
+# #ps.zip <- pscores.zip$fitted.values # Propensity scores with zips
+```
